@@ -1,0 +1,21 @@
+{
+  "name": "my-custom-source",
+  "source_name": "my-custom-source",
+  "date_col": "MatchDate",
+  "time_col": "Kickoff",
+  "home_col": "Home",
+  "away_col": "Away",
+  "fthg_col": "HomeGoals",
+  "ftag_col": "AwayGoals",
+  "hthg_col": "HTHome",
+  "htag_col": "HTAway",
+  "dayfirst": false,
+  "external_id_col": "MatchID",
+  "fixed_league": ["custom_league", "My Custom League", "Nowhere"],
+  "timezone": "Europe/Berlin",
+  "odds_columns": {
+    "Odds1": {"bookmaker": "bet365", "market": "1x2", "selection": "home"},
+    "OddsX": {"bookmaker": "bet365", "market": "1x2", "selection": "draw"},
+    "Odds2": {"bookmaker": "bet365", "market": "1x2", "selection": "away"}
+  }
+}

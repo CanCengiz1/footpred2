@@ -6,6 +6,7 @@ implementations delegate to the same pivot helper so they cannot diverge.
 
 Canonical frame columns:
   match_id, league_key, league, country, match_date, kickoff_utc,
+  home_team_id, away_team_id,
   ht_home, ht_away, ft_home, ft_away, has_ht,
   odds_<market>_<selection>_<bookmaker>   (float, NaN when unquoted;
                                            '.' in market names -> '_',
@@ -45,6 +46,8 @@ def frame_from_records(
             "country": lg.country if lg else None,
             "match_date": m.match_date,
             "kickoff_utc": m.kickoff_utc,
+            "home_team_id": m.home_team_id,
+            "away_team_id": m.away_team_id,
             "ht_home": m.ht_home, "ht_away": m.ht_away,
             "ft_home": m.ft_home, "ft_away": m.ft_away,
             "has_ht": m.has_halftime(),

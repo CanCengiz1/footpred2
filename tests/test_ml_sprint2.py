@@ -9,6 +9,7 @@ from footpred.infra.read_models import InMemoryMatchOddsReader, odds_col
 from footpred.ingest.mapping import FOOTBALL_DATA_CO_UK
 from footpred.ingest.pipeline import ImportPipeline
 from footpred.ingest.readers import read_table
+from footpred.ingest.resolution import normalize_name
 from footpred.ml.backtest.metrics import brier_score, calibration_table, log_loss
 from footpred.ml.backtest.runner import BacktestRunner
 from footpred.ml.backtest.simulator import simulate
@@ -35,7 +36,8 @@ def _seeded_uow() -> InMemoryUnitOfWork:
 # --------------------------- read model ----------------------------------- #
 
 def test_read_model_pivots_odds_wide():
-    frame = InMemoryMatchOddsReader(_seeded_uow()).load_completed()
+    uow = _seeded_uow()
+    frame = InMemoryMatchOddsReader(uow).load_completed()
     assert len(frame) == 6
     assert odds_col("1x2", "home", "bet365") in frame.columns
     assert odds_col("ou_2.5", "over", "market_avg") in frame.columns
@@ -44,6 +46,13 @@ def test_read_model_pivots_odds_wide():
     assert bool(frame["has_ht"].iloc[0]) is True
     # HT nulled on two rows: partial HT (Newcastle) + impossible HT (Brentford)
     assert (~frame["has_ht"]).sum() == 2
+
+    # team identity travels through the flat frame (needed by as-of features)
+    arsenal_id = uow.teams.get_by_normalized(normalize_name("Arsenal")).id
+    chelsea_id = uow.teams.get_by_normalized(normalize_name("Chelsea")).id
+    assert {"home_team_id", "away_team_id"} <= set(frame.columns)
+    assert arsenal["home_team_id"] == arsenal_id
+    assert arsenal["away_team_id"] == chelsea_id
 
 
 # --------------------------- features ------------------------------------- #

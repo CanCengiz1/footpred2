@@ -14,7 +14,7 @@ from footpred.ml.baselines import MarketBaseline
 from footpred.ml.datasets import DatasetBuilder, save_dataset
 from footpred.ml.splits import GroupFractionSplit
 
-DEFAULT_FEATURE_GROUPS = ["odds_core"]
+DEFAULT_FEATURE_GROUPS = ["odds_core", "team_form"]
 DEFAULT_DEVIG_METHODS = ["proportional", "power", "shin"]
 
 

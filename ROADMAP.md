@@ -172,6 +172,53 @@ unchanged pre-registered criteria, both fail more decisively than at
 baseline — evidence trending toward the null with more data, not away from
 it.
 
+### M2+ objective reframe and retest stopping rule (2026-07-04)
+
+**From M2 onward, further data-volume growth is justified as dataset
+expansion for future predictive modeling — not as continued search for
+evidence supporting the two paused families.** M1 already produced a
+decisive, pre-registered answer for both (above). Continuing to frame
+further imports around "will these become significant yet" would be a
+slow-motion form of optional stopping that undermines the pre-registration
+discipline itself — M1 already surfaced one secondary metric crossing
+p<0.10 by chance out of 18 tests run; more milestones and more metrics
+without a stopping rule would only amplify that risk. M2's actual
+justification is what it does independent of these two families: bigger
+training data for Dixon-Coles refits, more powerful backtests, and better
+walk-forward validation.
+
+**Stopping rule for the two already-paused families (home/away split,
+halftime resilience):**
+- At M2, the same two original, unmodified Stage 0 scripts *may* be rerun
+  once more as a passive confirmatory datapoint (near-zero cost, extends
+  the trend line already documented above) — not as the reason M2 happens.
+- **After M2, scheduled retesting of these two specific families stops,
+  regardless of the M2 result.** There is no M3/M4 retest of these two
+  planned.
+- A reversal at M2 (unlikely given the direction observed at M1, but
+  possible) is treated as a standalone, surprising finding warranting its
+  own dedicated investigation — not automatic promotion to the
+  implementation backlog, and not a reason to resume the retest cadence.
+
+**Scope of the stopping rule:** it applies only to *scheduled milestone
+retests of the current hypotheses* — i.e. rerunning the same Stage 0 test,
+unchanged, purely because a new data-volume milestone was reached. It does
+**not** block re-evaluation triggered by a material change in any of:
+the underlying hypothesis, the feature definition, the available data
+(e.g. event/xG data becoming available), the data source, or the
+experimental methodology itself. Any such change is a **new research
+question**, to be scoped and pre-registered on its own terms — not a
+continuation of the current Stage 0 evaluation, and therefore not
+something this stopping rule constrains.
+
+**Event-conditioned bucket (comeback tendency, lead-protection) is exempt
+from this stopping rule.** It has never had a first Stage 0 test — unlike
+the two paused families, testing it is a first-time candidate evaluation,
+not a repeated look. It already crossed its data-volume threshold at M1
+(~50-65 qualifying events/team vs. the 40 minimum, see Phase 3 above) and
+can be considered on its own merits whenever picked up, independent of
+M2/M3 dataset-expansion planning.
+
 ## Sprint 4 (closed): evidence-driven feature research framework
 
 **Status: closed.** Sprint 4 intentionally shipped no production feature

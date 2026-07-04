@@ -34,7 +34,13 @@ from scipy.special import gammaln
 def _tau(x, y, lam, mu, rho):
     """Low-score correction factor. 1.0 everywhere except the four cells
     where a plain independent-Poisson model is known to misfit football
-    scorelines. x, y may be arrays; lam, mu, rho broadcast against them."""
+    scorelines. x, y may be arrays; lam, mu, rho broadcast against them.
+
+    Matches Dixon & Coles (1997) exactly: tau(0,1) uses lam (home expected
+    goals), tau(1,0) uses mu (away expected goals) -- this cross-assignment
+    is not a typo, it's the paper's actual formula, confirmed against the
+    dashee87 and penaltyblog reference implementations. An earlier version
+    of this function had lam/mu swapped on these two cells."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     conditions = [
@@ -45,8 +51,8 @@ def _tau(x, y, lam, mu, rho):
     ]
     choices = [
         1.0 - lam * mu * rho,
-        1.0 + lam * rho,
         1.0 + mu * rho,
+        1.0 + lam * rho,
         1.0 - rho,
     ]
     return np.select(conditions, choices, default=1.0)
@@ -64,23 +70,44 @@ def _unpack(theta: np.ndarray, n_teams: int) -> Tuple[np.ndarray, np.ndarray, fl
     return attack, defense, float(home_adv), float(rho)
 
 
-def _neg_log_likelihood(theta, home_idx, away_idx, x, y, n_teams) -> float:
+def _time_weights(match_dates: pd.Series, xi: float, reference_date=None) -> np.ndarray:
+    """Dixon & Coles (1997) time-decay weight per match: exp(-xi * days_elapsed),
+    days_elapsed = reference_date - match_date. xi=0.0 -> every match weighted
+    1.0 regardless of date (no decay). reference_date defaults to the latest
+    date in match_dates (the fit's "as of today" date), so the most recent
+    training match always gets weight 1.0 and older ones are progressively
+    down-weighted."""
+    if xi == 0.0:
+        return np.ones(len(match_dates))
+    dates = pd.to_datetime(match_dates)
+    ref = pd.to_datetime(reference_date) if reference_date is not None else dates.max()
+    days = (ref - dates).dt.days.to_numpy(dtype=float)
+    return np.exp(-xi * days)
+
+
+def _neg_log_likelihood(theta, home_idx, away_idx, x, y, n_teams, weights) -> float:
     attack, defense, home_adv, rho = _unpack(theta, n_teams)
     lam = np.exp(attack[home_idx] + defense[away_idx] + home_adv)
     mu = np.exp(attack[away_idx] + defense[home_idx])
     logpmf_x = x * np.log(lam) - lam - gammaln(x + 1)
     logpmf_y = y * np.log(mu) - mu - gammaln(y + 1)
     tau = np.clip(_tau(x, y, lam, mu, rho), 1e-10, None)
-    return -float(np.sum(np.log(tau) + logpmf_x + logpmf_y))
+    return -float(np.sum(weights * (np.log(tau) + logpmf_x + logpmf_y)))
 
 
 class DixonColesModel:
     """Single-league Dixon-Coles model. Fit on one competition's historical
     results; predicts full scoreline distributions for any (home, away)
-    pair among the teams seen during fit."""
+    pair among the teams seen during fit.
 
-    def __init__(self, max_goals: int = 10):
+    xi: time-decay rate (Dixon & Coles 1997's exponential down-weighting of
+    older matches). 0.0 (default) disables decay entirely -- every match in
+    the training window is weighted equally, matching the module's original
+    behavior. xi > 0 requires a ``match_date`` column in ``matches``."""
+
+    def __init__(self, max_goals: int = 10, xi: float = 0.0):
         self.max_goals = max_goals
+        self.xi = xi
         self.team_ids_: List[int] = []
         self.team_index_: Dict[int, int] = {}
         self.attack_: np.ndarray = np.array([])
@@ -89,10 +116,15 @@ class DixonColesModel:
         self.rho_: float = 0.0
         self.converged_: bool = False
         self.n_matches_: int = 0
+        self.reference_date_ = None
 
     def fit(self, matches: pd.DataFrame) -> "DixonColesModel":
         """matches: columns home_team_id, away_team_id, ft_home, ft_away —
-        one league's completed matches."""
+        one league's completed matches. Also needs match_date if self.xi > 0."""
+        if self.xi > 0.0 and "match_date" not in matches.columns:
+            raise ValueError(
+                "xi > 0 requires a 'match_date' column to compute time-decay weights")
+
         teams = sorted(set(matches["home_team_id"]) | set(matches["away_team_id"]))
         n_teams = len(teams)
         if n_teams < 2:
@@ -103,13 +135,20 @@ class DixonColesModel:
         x = matches["ft_home"].to_numpy(dtype=float)
         y = matches["ft_away"].to_numpy(dtype=float)
 
+        if self.xi > 0.0:
+            weights = _time_weights(matches["match_date"], self.xi)
+            self.reference_date_ = pd.to_datetime(matches["match_date"]).max()
+        else:
+            weights = np.ones(len(matches))
+            self.reference_date_ = None
+
         n_params = 2 * n_teams + 1
         x0 = np.zeros(n_params)
         x0[2 * n_teams - 1] = 0.1  # mild positive home-advantage prior
         bounds = [(-3.0, 3.0)] * (2 * n_teams - 1) + [(-3.0, 3.0)] + [(-0.9, 0.9)]
 
         result = minimize(_neg_log_likelihood, x0,
-                           args=(home_idx, away_idx, x, y, n_teams),
+                           args=(home_idx, away_idx, x, y, n_teams, weights),
                            method="L-BFGS-B", bounds=bounds)
 
         attack, defense, home_adv, rho = _unpack(result.x, n_teams)
@@ -167,16 +206,18 @@ class DixonColesPredictor:
     home/away team wasn't seen within that league's training data — same
     convention as MarketBaseline."""
 
-    def __init__(self, max_goals: int = 10):
+    def __init__(self, max_goals: int = 10, xi: float = 0.0):
         self.max_goals = max_goals
-        self.name = "DixonColes"
+        self.xi = xi
+        self.name = "DixonColes" if xi == 0.0 else f"DixonColes[xi={xi}]"
         self._models: Dict[str, DixonColesModel] = {}
 
     def fit(self, train: pd.DataFrame) -> "DixonColesPredictor":
         """train: columns league_key, home_team_id, away_team_id, ft_home,
-        ft_away — typically the 'train' split of a built dataset."""
+        ft_away — typically the 'train' split of a built dataset. Also needs
+        match_date if self.xi > 0."""
         self._models = {
-            league_key: DixonColesModel(max_goals=self.max_goals).fit(group)
+            league_key: DixonColesModel(max_goals=self.max_goals, xi=self.xi).fit(group)
             for league_key, group in train.groupby("league_key")
         }
         return self

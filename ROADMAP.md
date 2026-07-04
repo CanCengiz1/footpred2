@@ -299,6 +299,116 @@ would count as a material change and could be scoped as its own new
 research question later — it does not reopen or overturn today's pooled
 verdict, and is not itself Stage-0-tested here.
 
+## Dixon-Coles: M2-objective validation, implementation audit, and corrected evaluation (2026-07-04)
+
+**Status: investigation complete.** After M2, the question "did the expanded
+dataset materially improve the Dixon-Coles baseline?" was investigated in
+three stages. This section documents all three explicitly, because stage 3
+**supersedes** stage 1's conclusion — the earlier finding was based on a
+buggy implementation and should no longer be cited on its own.
+
+### 1. Original (pre-audit) evaluation — superseded, do not cite standalone
+
+Retrained Dixon-Coles on the M2 10-season dataset via `WalkForwardSplit`
+(4 expanding folds, train 2,624 -> 10,496 matches) and compared to
+B0-market[power]. Findings at the time:
+- Rho positive in 11 of 12 fold x league fits (0.011-0.055), same
+  wrong-sign anomaly as the original Sprint 3B single-season result — read,
+  at the time, as "stable across a 6x training-size range, therefore
+  probably a real property of the data, not small-sample noise."
+- 1x2 log-loss gap to B0 essentially flat across folds (0.033-0.046),
+  **not shrinking** as training data grew 4x within the walk-forward design.
+- Provisional conclusion drawn at the time: "further data-volume expansion
+  (M3/M4) is unlikely to close this gap — looks like a model-class
+  limitation, not a data limitation."
+
+**This conclusion is superseded by section 3 below and should not be
+treated as a standing finding.** It was correct that the gap didn't close
+with more data *in that implementation* — but the implementation itself
+had two confirmed defects (section 2), so "model-class limitation" was not
+yet a safe inference from that observation alone.
+
+### 2. Implementation audit — two confirmed defects, both fixed
+
+Before accepting the model-class-limitation conclusion, audited the
+implementation against Dixon & Coles (1997) and two independent reference
+implementations (dashee87, penaltyblog blogs), covering rho parameterization,
+likelihood function, optimization objective, time-decay weighting, and
+low-score adjustment scope.
+
+- **Tau lambda/mu swap (confirmed bug).** `_tau()`'s (1,0) and (0,1) cells
+  had lambda (home expected goals) and mu (away expected goals) swapped
+  relative to the paper and both reference implementations. Confirmed via
+  direct fetch of reference source code, not memory alone. The existing
+  `test_tau_matches_hand_computed_values_on_special_cells` had encoded the
+  *swapped* formula as correct, and the synthetic MLE-recovery test
+  simulated and fit using the same (buggy) internal `_tau`, so it only ever
+  checked self-consistency, never external correctness — explaining why
+  the bug was invisible to the existing suite. Fixed in
+  `src/footpred/ml/models/dixon_coles.py`; test corrected; a dedicated
+  regression test with hardcoded values added
+  (`test_tau_regression_lambda_mu_not_swapped`) that fails under the old
+  swapped formula specifically, independent of the corrected hand-computed
+  test.
+- **Time-decay weighting (confirmed gap, not a bug — a missing feature).**
+  The original method's exponential match-recency weight (`exp(-xi*days)`)
+  was entirely absent — every match in a training window was weighted
+  equally regardless of age, meaning M2's 10-season fit pooled a decade of
+  team strength with zero decay. Added as `xi` (default 0.0, backward
+  compatible) on both `DixonColesModel` and `DixonColesPredictor`; requires
+  a `match_date` column when `xi > 0` (raises otherwise); new tests cover
+  the weight formula and a synthetic regime-shift case proving decay
+  actually tracks recent form better than no decay.
+- Likelihood function, optimization objective (MLE via `scipy.optimize`,
+  bounds non-binding), and low-score adjustment scope (exactly the 4
+  correct cells) were all confirmed **faithful to the paper** — only the
+  two items above were defects.
+- All 78 project tests pass after the fix (17 in `test_dixon_coles.py`,
+  including 6 new tests added by this audit).
+
+### 3. Corrected evaluation — current, authoritative conclusion
+
+Reran the identical M2 walk-forward comparison with the fixed
+implementation, then grid-searched the time-decay rate.
+
+- **Rho: fixed.** Negative in all 12 fold x league fits with corrected tau
+  alone (no decay), range -0.018 to -0.077 — squarely in the literature's
+  typical range. Confirms the tau swap, not the data, caused the original
+  wrong-sign result.
+- **ξ grid search (global):** tested [0, 0.0005, 0.001, 0.0018, 0.003,
+  0.005] by mean held-out 1x2 log-loss across the 4 folds. Best: **ξ=0.001**
+  (~1.9-year half-life), mean log-loss 1.0328 (ξ=0) -> 1.0288 (ξ=0.001) ->
+  1.0364 (ξ=0.005, aggressive decay is clearly worse) — a shallow U-shape,
+  not "more decay is always better."
+- **ξ grid search (per-league):** E0 best ξ=0.0018 (log-loss 0.98980 vs.
+  0.99168 at global ξ, **+0.19%**), E1 best ξ=0.0010 (**identical** to the
+  global value, +0.00%), SP1 best ξ=0.0005 (1.00749 vs. 1.00773,
+  **+0.02%**). Differences are within fold-to-fold noise already observed
+  elsewhere (e.g. fold 2's COVID-window anomaly) — **no material
+  league-specific tuning benefit; global ξ=0.001 is stable and used as the
+  default.**
+- **DC vs. B0 gap:** narrows modestly with the fixes — average 1x2 gap
+  0.0392 (no decay) -> 0.0352 (ξ=0.001), a ~10% relative reduction, most
+  concentrated in the most recent fold (2023-25), where 1x2 calibration
+  (ECE) nearly matches B0 exactly (0.0051 vs. 0.0052). **Dixon-Coles still
+  loses to B0 on every metric, every fold, even at best ξ** — the fixes did
+  not reverse the headline result.
+
+**Revised, current conclusion:** the tau bug and missing time-decay were
+real, confirmed implementation defects that were contributing to the
+earlier apparent stagnation — fixing them produced a real (if partial)
+narrowing of the DC-B0 gap and, more importantly, a now-trustworthy rho
+estimate. Dixon-Coles still underperforms the de-vigged market on every
+metric even after the fixes, so a genuine gap likely remains — but its true
+size was not knowable from the pre-audit implementation, and the earlier
+"model-class limitation, not data limitation" framing should be read as
+**directionally probably still right, but not established with the
+confidence the pre-audit numbers implied.** This is now a fair evaluation
+of Dixon-Coles; per the user's call, the investigation is complete and the
+model is not being further optimized (e.g. no per-league ξ, no further
+grid refinement) — next research effort moves elsewhere rather than
+continuing to tune this baseline.
+
 ## Sprint 4 (closed): evidence-driven feature research framework
 
 **Status: closed.** Sprint 4 intentionally shipped no production feature

@@ -76,15 +76,17 @@ exist — this item replaces that with a tracked, reportable mechanism.
    code to be written without a human explicitly asking for it.
 
 **Currently paused families this would track:** team-specific home/away
-split, halftime resilience (continuous reformulation). See project memory
-for the full analysis behind each.
+split, halftime resilience (continuous reformulation). **Both remain paused
+after the M1 retest** (see Data Expansion phase below) — the registry
+mechanism itself is still unbuilt (this section is design only), but the
+retest it would have triggered was run manually and documented there.
 
 ## Data Expansion phase
 
-**Status: planned, not started.** Sprint 4 concluded that the bottleneck for
-team-behavioural features is data volume, not feature design (see "Sprint 4"
-below). This phase grows the database so the paused-feature registry above
-has something to actually evaluate against.
+**Status: in progress — M1 executed, M2-M4 not started.** Sprint 4 concluded
+that the bottleneck for team-behavioural features is data volume, not feature
+design (see "Sprint 4" below). This phase grows the database so the
+paused-feature registry above has something to actually evaluate against.
 
 **Governing rule: depth before breadth, and never skip football-data.co.uk
 for a new provider early.** Fully exhaust football-data.co.uk's available
@@ -93,22 +95,26 @@ leagues it covers — before considering any other data provider. A new
 provider is only justified once that source is genuinely exhausted, or for
 data football-data.co.uk structurally does not have (see Phase 5).
 
-1. **Phase 1 — Depth on the existing 3 leagues (highest priority).** Import
-   all additional available historical seasons for E0, E1, SP1 via the
-   existing importer (same auto-detected layout, same mapping profile, no
-   ingest schema changes). Directly targets the registry's "minimum 3
-   seasons" threshold — currently 1 season each.
+1. **Phase 1 — Depth on the existing 3 leagues (highest priority). DONE
+   (M1, 2026-07-04).** Imported 2020-21 through 2023-24 for E0/E1/SP1 (12
+   files, existing importer, zero rejections, zero fuzzy-match aliases) —
+   DB grew from 1,312 to 6,560 matches, 1 to 5 seasons/league. See "M1
+   results" below.
 2. **Phase 2 — Per-team threshold verification (checkpoint, not an import
-   step).** Re-run the registry's eligibility check per **team**, not per
-   league average, once Phase 1 lands — a team promoted/relegated partway
-   through the imported history won't have the same depth as one that stayed
-   in the division the whole time.
+   step). DONE (M1).** Per-team venue-match counts checked, not just league
+   averages: median team has 69-76 matches/venue (comfortably over the
+   50 minimum); 29 of 94 team-league rows fall short (teams promoted/
+   relegated partway through the window, as expected) — not a data-quality
+   issue, just less depth for those specific teams.
 3. **Phase 3 — Extend to a 4th season for the event-conditioned bucket.**
    Rare-event families (comeback tendency, lead-protection) need ~40
    qualifying events/team; 3 seasons gives roughly 30-39 trailing-at-HT
-   situations/team, just under threshold. A 4th season likely closes this
-   gap for that specific bucket even though the two already-paused families
-   are eligible after Phase 1.
+   situations/team, just under threshold. **Threshold technically crossed by
+   M1's 5 seasons (~50-65 events/team)**, but this bucket was never
+   registered as a paused family and wasn't tested in M1 — M1 stayed scoped
+   to retesting only the two already-paused families with their unchanged
+   original protocols. Running a first-ever Stage 0 for this bucket is a
+   separate, not-yet-taken decision.
 4. **Phase 4 — Breadth: additional leagues, still football-data.co.uk.**
    Add further leagues the same provider covers (e.g. other English
    divisions, other top-tier European leagues), same importer, no code
@@ -126,6 +132,45 @@ data football-data.co.uk structurally does not have (see Phase 5).
 estimates; before executing Phase 1, confirm which season files
 football-data.co.uk actually has available for E0/E1/SP1 rather than
 assuming coverage.
+
+### M1 results (2026-07-04): both paused families remain paused
+
+Imported 2020-21 -> 2023-24 (E0/E1/SP1, football-data.co.uk, existing
+importer, 0 rejections, 0 fuzzy-match aliases). Reran the **original,
+unmodified** Stage 0 scripts for both registered families against the
+5-season dataset, same pre-registered success/rejection criteria as the
+single-season baseline.
+
+**Home/away split** (primary metric: points, pooled, league fixed effects):
+
+| | baseline (1 season, n=64) | M1 (5 seasons, n=70) |
+|---|---|---|
+| home incr. R² / p / coef | 0.0002 / 0.881 / +0.041 | 0.0001 / 0.926 / -0.023 |
+| away incr. R² / p / coef | 0.0080 / 0.431 / -0.200 | 0.0004 / 0.821 / -0.054 |
+
+**Halftime resilience** (pooled, league fixed effects):
+
+| | baseline (n=64) | M1 (n=70) |
+|---|---|---|
+| incr. R² / p / coef | 0.0211 / 0.264 / -0.158 | 0.0125 / 0.327 / -0.108 |
+
+**Finding:** both families moved *further* from the pre-registered success
+bar with 5x the data, not closer. If either effect were real-but-power-limited,
+more data should have tightened the estimates toward some non-zero value —
+instead effect sizes shrank and p-values grew. Sharpest example: at baseline,
+SP1 alone showed the single largest per-league resilience hit (incr.
+R²=0.108, the number that made resilience look borderline-promising); at M1,
+SP1's incr. R² collapsed to 0.0026 — a single-season fluke evaporating
+exactly as more data arrived. One secondary metric (venue away-GA) crossed
+p<0.10 for the first time (p=0.080), but it wasn't the pre-registered primary
+metric, and its coefficient sign is still the same mean-reversion direction
+seen everywhere else, not the persistence direction the hypothesis needs —
+read as one of 18 secondary tests crossing by chance, not a promotion signal.
+
+**Decision: neither family returns to the implementation backlog.** Per the
+unchanged pre-registered criteria, both fail more decisively than at
+baseline — evidence trending toward the null with more data, not away from
+it.
 
 ## Sprint 4 (closed): evidence-driven feature research framework
 

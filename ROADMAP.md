@@ -83,7 +83,7 @@ retest it would have triggered was run manually and documented there.
 
 ## Data Expansion phase
 
-**Status: in progress — M1 executed, M2-M4 not started.** Sprint 4 concluded
+**Status: in progress — M1 and M2 executed, M3-M4 not started.** Sprint 4 concluded
 that the bottleneck for team-behavioural features is data volume, not feature
 design (see "Sprint 4" below). This phase grows the database so the
 paused-feature registry above has something to actually evaluate against.
@@ -218,6 +218,86 @@ not a repeated look. It already crossed its data-volume threshold at M1
 (~50-65 qualifying events/team vs. the 40 minimum, see Phase 3 above) and
 can be considered on its own merits whenever picked up, independent of
 M2/M3 dataset-expansion planning.
+
+### M2 results (2026-07-04)
+
+**M2's real purpose: training-data expansion for future predictive
+models — not another feature-validation milestone.** Per the reframe above,
+M2 was executed to grow the dataset for future Dixon-Coles refits, backtest
+power, and walk-forward validation. It was not run in search of evidence
+for the two paused families; any Stage 0 output below is a side effect of
+having more data, not the reason the import happened.
+
+**Import.** Verified all 15 target files (2015-16 -> 2019-20, E0/E1/SP1)
+were actually available (HTTP 200) and format-checked *before* importing,
+per the plan. All passed. Imported cleanly: 6,560 matches added (E0 1,900 /
+E1 2,760 / SP1 1,900), 0 rejected, 0 duplicates. **Total: 13,120 matches,
+10 seasons/league (2015-16 -> 2024-25).** Cumulative rejections across every
+import to date: 0.
+
+**Entity resolution.** 87 total teams (up from 80 after M1), zero
+low-confidence/fuzzy-match aliases in the entire DB. Spot-checked the four
+known yo-yo teams (Bournemouth, Fulham, Norwich, Watford) — each resolves
+to a single `team_id` with matches correctly split across E0/E1 by date, no
+duplicate entities from promotion/relegation churn.
+
+**Format differences encountered.** 2015-2017 files use 2-digit years
+(`07/08/15`) vs. later files' 4-digit years — verified this parses to the
+correct century through the actual pipeline date parser
+(`pd.to_datetime(..., dayfirst=True)`) before importing, not assumed to
+work. One source-data quality note (not a pipeline issue): `E1_1819.csv`
+has 2 rows with missing HT scores — handled natively by the nullable
+schema, simply excluded from HT-dependent analysis downstream. No importer
+or schema changes were required, as expected.
+
+**Final validation:** all of the above passed — clean import, verified
+entity resolution, format differences understood and confirmed non-breaking
+ahead of time rather than discovered after the fact.
+
+**Passive Stage 0 rerun — final scheduled confirmatory retest only,** per
+the stopping rule agreed before execution. Not a search for evidence; not
+followed by any further scheduled retest of these two families regardless
+of outcome.
+
+*Home/away split* (primary metric: points, pooled, league fixed effects):
+
+| | baseline (n=64) | M1 (n=70) | M2 (n=75) |
+|---|---|---|---|
+| home incr. R² / p / coef | 0.0002/0.881/+0.041 | 0.0001/0.926/-0.023 | 0.0061/0.374/-0.318 |
+| away incr. R² / p / coef | 0.0080/0.431/-0.200 | 0.0004/0.821/-0.054 | 0.0006/0.784/+0.090 |
+
+*Halftime resilience* (primary metric: pooled):
+
+| | baseline (n=64) | M1 (n=70) | M2 (n=75) |
+|---|---|---|---|
+| incr. R² / p / coef | 0.0211/0.264/-0.158 | 0.0125/0.327/-0.108 | 0.0000/0.983/+0.002 |
+
+Resilience's pooled incr. R² has now decayed smoothly to exactly zero
+(0.0211 -> 0.0125 -> 0.0000) with p rising to 0.983 — as clean a
+convergence-to-null trend across three checkpoints as this kind of test
+produces. Home/away split's primary points metric remains clearly non-
+significant on both sides. A few secondary (non-decision) metrics crossed
+p<0.05 this round, but with inconsistent signs across home/away and across
+milestones (mostly still mean-reversion-signed, the wrong direction for the
+hypothesis) — the pattern expected from uncorrected multiple looks across
+~24 metrics x 3 checkpoints, not a coherent signal, and none of them are the
+pre-registered primary metric.
+
+**Decision: both original families remain paused.** Per the pre-registered
+primary metrics, unchanged. This was, per the stopping rule, the **final**
+scheduled retest for both — no further scheduled Stage 0 retesting of
+home/away split or halftime resilience is planned.
+
+**Note on E1 resilience — flagged for possible future consideration, not a
+reopening of this evaluation.** E1's per-league resilience result has shown
+a borderline, positively-signed, not-quite-significant pattern at both M1
+(p=0.103) and M2 (p=0.077), unlike E0/SP1 which flip near zero. This is a
+narrower, different hypothesis than the one tested here (a Championship-
+specific effect, not "resilience in general" pooled across leagues). Per
+the stopping rule's scope clarification above, a league-specific hypothesis
+would count as a material change and could be scoped as its own new
+research question later — it does not reopen or overturn today's pooled
+verdict, and is not itself Stage-0-tested here.
 
 ## Sprint 4 (closed): evidence-driven feature research framework
 

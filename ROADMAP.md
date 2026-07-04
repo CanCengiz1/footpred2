@@ -713,3 +713,48 @@ primary-target, pre-registered confirmatory test of it before any promotion
 decision. Everything else (`team_form`, divergence, the E1-inefficiency
 hypothesis) is now on firmer footing to leave as-is than before this
 diagnostic pair was run.
+
+## Corrected confirmatory 1x2-coherence milestone (2026-07-04) — provisionally promoted
+
+**Status: complete.** Before running this, the project stepped back for a strategic reassessment
+(not just "what's next") of the entire research program — see
+`docs/RESEARCH_RETROSPECTIVE.md` for the full reasoning. That review surfaced a design flaw in the
+original coherence diagnostic: implied goals had been backed out assuming independent scoring
+(ρ=0), when the audited Dixon-Coles model's own fitted ρ is small but reliably negative. This
+milestone reruns the test correctly.
+
+**Design deviation, decided before seeing results:** O/U odds (any bookmaker) are structurally
+absent before ~2019 — already known from the divergence ablation. Reusing the standard 4-fold
+`WalkForwardSplit` over the full 10-season history would waste two folds that cannot test this
+hypothesis at all. The test population for this milestone is explicitly **"matches with usable 1x2
++ O/U bet365 odds"** (7,870 matches, 2019-08-02 to 2025-05-25, all three leagues consistently
+covered) — not the full database — evaluated with 5 expanding folds (~1 season/block) instead of 2
+real folds out of 4.
+
+**Correction:** implied (λ, μ) and the implied O/U probability now use the audited Dixon-Coles τ
+function with each fold's leakage-safe, fitted per-league ρ (DC fit on full goal history, no odds
+needed, cut off strictly before each fold's test window). 1x2 promoted to the pre-registered
+primary target (was secondary in the original diagnostic); O/U 2.5 is secondary this time.
+
+**Result:** positive in 4 of 5 folds (mean +0.00246 at default regularization). A C-grid check
+(mirroring `team_form`'s discipline exactly) found the effect never collapses or reverses across a
+1000x regularization range (mean gain 0.00213–0.00238), with the identical 4-of-5 sign pattern at
+every point in the grid, and Brier/ECE improving alongside log-loss. The ρ-correction itself turned
+out to matter little in practice (fitted ρ values are small) — worth checking rigorously regardless,
+since we couldn't have known that in advance.
+
+**Classification: provisionally promoted, pending independent replication** — a new fourth tier
+introduced specifically because this result didn't fit cleanly into rejected/promoted/inconclusive.
+Full definition and reasoning in `docs/RESEARCH_RETROSPECTIVE.md`'s methodology section. In short:
+this is the strongest, most regularization-stable positive result the project has produced, but one
+fold consistently disagrees, the effect sits at the edge of (not clearly beyond) this project's
+observed noise band, and the evaluation is necessarily restricted to the post-2019 subset — short of
+the confidence bar `team_form`'s rejection earned.
+
+**Confirmation path (general, not tied to this or any specific future milestone):** promotes to
+fully **promoted** if independently replicated on any data that played no role in discovering this
+signal — new seasons, additional leagues, or a different compatible dataset all qualify equally;
+independence is what matters, not which kind of new data it is. Reclassifies to **not confirmed** if
+that replication fails to reproduce the effect. Whenever such data becomes available for any
+reason, rerunning this exact test (unchanged methodology) on the independent portion is the natural
+next occasion — this is not exclusively coupled to a future M3/M4-style data-expansion milestone.

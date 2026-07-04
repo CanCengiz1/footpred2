@@ -32,11 +32,12 @@ audit, the `TabularPredictor` milestone, and the first round of Stage 2 ablation
 1. [Core finding](#core-finding)
 2. [Research methodology](#research-methodology)
 3. [Falsified hypotheses](#falsified-hypotheses)
-4. [Corrected engineering findings (not hypotheses)](#corrected-engineering-findings-not-hypotheses)
-5. [Open and plausible hypotheses](#open-and-plausible-hypotheses)
-6. [Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out)
-7. [Standing infrastructure and capabilities](#standing-infrastructure-and-capabilities)
-8. [How to use this document](#how-to-use-this-document)
+4. [Provisionally promoted findings](#provisionally-promoted-findings)
+5. [Corrected engineering findings (not hypotheses)](#corrected-engineering-findings-not-hypotheses)
+6. [Open and plausible hypotheses](#open-and-plausible-hypotheses)
+7. [Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out)
+8. [Standing infrastructure and capabilities](#standing-infrastructure-and-capabilities)
+9. [How to use this document](#how-to-use-this-document)
 
 ---
 
@@ -112,6 +113,34 @@ pre-specified. Results are now judged qualitatively but consistently, on:
   needs to look different from that band, not clear an arbitrary number),
 - **trajectory across data-growth checkpoints** — a real effect should hold or strengthen as more
   data arrives; several rejected effects visibly *shrank* toward zero instead (see below).
+
+### A fourth classification tier: provisionally promoted, pending independent replication
+
+The original three-way outcome for an ablation — rejected, promoted, or inconclusive/underpowered —
+turned out not to have a good home for a result that is real by every check this project applies
+(consistent across the majority of informative folds, survives a regularization sweep without
+collapsing or reversing, improves multiple metrics together) but has only ever been evaluated on
+one body of data. Forcing that into "promoted" overstates confidence that hasn't actually been
+earned yet; forcing it into "inconclusive" understates a result that is meaningfully different from
+this project's established noise band. A fourth tier was introduced to describe it honestly:
+
+- **Provisionally promoted** — a robustness-checked positive result (survives a regularization/
+  sensitivity sweep, coherent across metrics, majority-consistent sign across informative folds)
+  that has **not yet been independently replicated** on data that played no role in discovering it.
+  Usable in further experiments as a live candidate; not yet an established finding.
+- **Promoted** — a provisionally promoted result that **has** been independently replicated on
+  previously unseen data. The defining property is **independence, not chronology or data source**:
+  newly imported seasons, additional leagues, a different compatible historical dataset — any of
+  these count, as long as the replication data was not involved in discovering the original signal.
+  A later season becoming available is not privileged over, say, a new league being added; what
+  matters is that the data wasn't part of the original search.
+- **Not confirmed** — independent replication was attempted and failed to reproduce the effect.
+  Treated with the same respect as any other null result — not silently retried until it works.
+
+This is deliberately a general framework, not coupled to any one future milestone (e.g. the next
+Data Expansion checkpoint) — whatever independent dataset becomes available first is the natural
+occasion to attempt confirmation, and this section should be updated whenever that happens for any
+provisionally promoted finding, not just the one that motivated adding this tier.
 
 ### Leakage discipline
 
@@ -231,6 +260,65 @@ is specifically under-modeled relative to E0/SP1 — see [Open and plausible hyp
 
 ---
 
+## Provisionally promoted findings
+
+Results classified under the fourth tier defined in [Research methodology](#research-methodology):
+robustness-checked and positive, but not yet independently replicated. See that section for exactly
+what "provisionally promoted," "promoted," and "not confirmed" mean and how one graduates to
+another.
+
+### Cross-market coherence → 1x2 (ρ-corrected)
+
+**Claim tested:** whether the O/U-2.5 market's price disagrees with what the 1x2 market's implied
+scoreline distribution predicts — with that implied distribution now computed via the *audited*
+Dixon-Coles model (τ-corrected, using each fold's leakage-safe fitted per-league ρ), superseding an
+earlier diagnostic run that had assumed independence (ρ=0). 1x2 was pre-registered as the primary
+target this time (it had only ever been tested as a secondary/diagnostic endpoint before).
+
+**Design:** evaluated on the explicit test population of "matches with usable 1x2 + O/U bet365
+odds" — 7,870 matches, 2019-08-02 to 2025-05-25, all three leagues consistently covered — rather
+than the full 10-season database. This restriction was decided *before* running anything, not
+discovered after: O/U odds (any bookmaker) are structurally absent before ~2019, a fact already on
+record from the divergence ablation, so reusing the standard 4-fold split over the full history
+would have wasted two folds that cannot test this hypothesis at all. Within the restricted, fully
+informative population, 5 expanding `WalkForwardSplit` folds were used (~1 season/block) instead of
+2 real folds out of 4 — more statistical power at the same computational cost, at the price of
+comparability to prior tests' exact fold structure. Dixon-Coles's ρ itself was fit on full goal
+history (it needs no odds), cut off leakage-safely at each fold's test-window start.
+
+**Result:**
+- Primary (1x2): incremental gain positive in 4 of 5 folds (−0.00063, +0.00241, +0.00189, +0.00552,
+  +0.00309; mean +0.00246 at default regularization).
+- The ρ-correction changed very little versus the original independence assumption (mean gain
+  +0.00278 under ρ=0 on the identical folds) — the theoretical concern that motivated this milestone
+  was worth checking rigorously, but the fitted ρ values turned out small enough that it wasn't a
+  major confound in practice.
+- **C-grid check** (C = 0.01 to 10.0, mirroring the `team_form` discipline exactly): best C=0.01 for
+  both baseline and candidate; the effect **never collapsed or reversed** across the full grid
+  (mean gain 0.00213–0.00238), and the same 4-of-5 sign pattern held at every single point in the
+  grid, not just at best-C. Brier and ECE both improve alongside log-loss at best C.
+- Secondary (O/U 2.5) stayed null throughout, consistent with every prior run.
+
+**Why provisionally promoted, not promoted or rejected:** this is the most consistent, most
+metric-coherent, most regularization-stable positive result the project has produced — clearly
+stronger than the underpowered divergence/original-coherence results, and it does not collapse under
+a robustness check the way a spurious effect would. But it falls short of the confidence bar
+`team_form`'s rejection earned: one fold (the earliest, smallest-history fold) consistently
+disagrees rather than 100% consistency; the mean effect size sits at the edge of, not clearly beyond,
+the ~0.0005–0.005 noise band this project has repeatedly observed; the evaluation is necessarily
+restricted to the post-2019 odds-covered subset, not the full history; and with only 2-3 features in
+play, the C-grid here is a structurally weaker stress test than it was for `team_form`'s 49+ feature
+ablation, so "survived the C-grid" carries less evidentiary weight than the same phrase did there.
+
+**Confirmation path:** promotes to fully **promoted** if independently replicated — same feature
+definition, same methodology — on any data that played no role in discovering this signal (new
+seasons once imported, additional leagues, or a different compatible dataset; independence is what
+matters, not which of these it is). Reclassifies to **not confirmed** if that replication fails to
+reproduce the effect. Until then, usable as an active candidate in further experiments, not treated
+as an established finding.
+
+---
+
 ## Corrected engineering findings (not hypotheses)
 
 These are implementation defects, not claims about the world — worth recording precisely because
@@ -275,16 +363,9 @@ These have **not** been rejected — either untested, or tested with genuinely i
 or only indirectly addressed. They should not be re-proposed as if novel, but they also should not
 be treated as settled.
 
-### Cross-market coherence, 1x2 target
-
-Whether the O/U-2.5 market's price disagrees with what the 1x2 market's implied scoreline
-distribution would predict (an "incoherence" measure) predicts the 1x2 outcome. Tested as a
-pre-registered *secondary* endpoint (the primary — O/U 2.5 itself — came back null), and showed a
-consistent, non-trivial, growing-not-shrinking effect across the two informative folds, plus
-moderate consistency across league and season-third segments. **Explicitly not accepted as a
-finding** — it was secondary, and the evidence base (2 usable folds, due to O/U odds coverage
-starting only around 2019) is thin. The single most promising open thread in the project; needs
-its own fresh, primary-target, pre-registered confirmatory test before it means anything.
+*(Cross-market coherence, previously listed here as the project's most promising open thread, has
+since been given its own primary-target confirmatory test and reclassified — see
+[Provisionally promoted findings](#provisionally-promoted-findings).)*
 
 ### Bookmaker divergence (Bet365 vs. market-average, de-vigged)
 
@@ -380,15 +461,19 @@ Before proposing a new research direction or feature:
    idea is "another way of deriving signal from historical scorelines," the `team_form` mechanism
    almost certainly applies — that is not a reason to skip testing it, but it is a reason to expect
    a null result and to say so before running the test.
-2. **Check the open-hypotheses section** before re-deriving a question that's already
-   mid-investigation (e.g., the 1x2-coherence follow-up) — extend that thread rather than starting
-   a parallel one.
-3. **Check the deprioritized section** for ideas already reasoned away, so the reasoning gets
+2. **Check the provisionally promoted section** before treating a live candidate as either fully
+   established or non-existent — and if independent data becomes available for any reason, that is
+   the occasion to attempt the confirmation check described there, not something to defer
+   indefinitely.
+3. **Check the open-hypotheses section** before re-deriving a question that's already
+   mid-investigation — extend that thread rather than starting a parallel one.
+4. **Check the deprioritized section** for ideas already reasoned away, so the reasoning gets
    engaged with directly rather than the idea being re-proposed as if novel.
-4. **Use the methodology section** as the evaluation checklist for any new experiment — pre-register
+5. **Use the methodology section** as the evaluation checklist for any new experiment — pre-register
    a primary endpoint, check leakage and coverage explicitly, judge results against observed noise
-   rather than an invented threshold, and treat any segmented breakdown as hypothesis-generating
-   only.
+   rather than an invented threshold, treat any segmented breakdown as hypothesis-generating only,
+   and use the four-tier classification (rejected / provisionally promoted / promoted / not
+   confirmed) rather than forcing a result into the wrong bucket for convenience.
 
 This document should be **read before ROADMAP.md's next milestone is scoped**, not just after it
 runs — its job is to keep new work honest about what's already known, not to catalog results after

@@ -12,7 +12,8 @@ from footpred.infra.read_models import InMemoryMatchOddsReader
 from footpred.ml.backtest.runner import BacktestRunner
 from footpred.ml.datasets import DatasetBuilder
 from footpred.ml.models.tabular import (
-    LEAGUE_COL, TabularPredictor, _odds_core_columns, _team_form_columns,
+    LEAGUE_COL, TabularPredictor, _odds_consensus_columns,
+    _odds_core_columns, _odds_divergence_columns, _team_form_columns,
     resolve_feature_columns,
 )
 from footpred.ml.splits import GroupFractionSplit
@@ -57,6 +58,18 @@ def test_resolve_feature_columns_empty_result_raises():
     frame = pd.DataFrame({"match_id": [1, 2]})  # no feature columns at all
     with pytest.raises(ValueError, match="resolved to zero columns"):
         resolve_feature_columns(frame, ["team_form"])
+
+
+def test_odds_consensus_and_divergence_partition_odds_core():
+    consensus, divergence, full = (set(_odds_consensus_columns()),
+                                    set(_odds_divergence_columns()),
+                                    set(_odds_core_columns()))
+    assert consensus & divergence == set()  # no overlap
+    assert consensus | divergence == full   # covers odds_core exactly
+    assert divergence == {
+        "div_1x2_home_shin", "div_1x2_draw_shin", "div_1x2_away_shin",
+        "div_ou_2_5_over_shin", "div_ou_2_5_under_shin",
+    }
 
 
 # --------------------------- fit/predict behavior ---------------------------- #

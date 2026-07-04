@@ -59,8 +59,11 @@ class TabularEstimator(Protocol):
     def predict_proba(self, X: np.ndarray) -> np.ndarray: ...
 
 
-def _odds_core_columns() -> List[str]:
-    """Mirrors OddsFeatureGroup's exact naming scheme (odds_features.py)."""
+def _odds_consensus_columns() -> List[str]:
+    """odds_core's level/consensus columns: raw implied probabilities,
+    overround, and de-vigged per-bookmaker fair probabilities -- everything
+    EXCEPT the bookmaker-divergence columns. This is "what the price says",
+    as opposed to "how much sources disagree about the price"."""
     cols: List[str] = []
     for market, sels in MARKET_SELECTIONS.items():
         mkt = market.replace(".", "_")
@@ -71,9 +74,25 @@ def _odds_core_columns() -> List[str]:
             for method in DEVIG_METHODS:
                 for s in sels:
                     cols.append(f"devig_{mkt}_{s}_{book}_{method}")
+    return cols
+
+
+def _odds_divergence_columns() -> List[str]:
+    """odds_core's bookmaker-divergence columns only (Bet365 minus
+    market-average, de-vigged) -- a meta-signal about disagreement between
+    pricing sources, structurally distinct from the consensus price level."""
+    cols: List[str] = []
+    for market, sels in MARKET_SELECTIONS.items():
+        mkt = market.replace(".", "_")
         for s in sels:
             cols.append(f"div_{mkt}_{s}_{DIVERGENCE_METHOD}")
     return cols
+
+
+def _odds_core_columns() -> List[str]:
+    """Mirrors OddsFeatureGroup's exact naming scheme (odds_features.py):
+    consensus + divergence together."""
+    return _odds_consensus_columns() + _odds_divergence_columns()
 
 
 def _team_form_columns() -> List[str]:
@@ -90,6 +109,8 @@ def _team_form_columns() -> List[str]:
 _KNOWN_GROUP_COLUMNS: Dict[str, Callable[[], List[str]]] = {
     "odds_core": _odds_core_columns,
     "team_form": _team_form_columns,
+    "odds_consensus": _odds_consensus_columns,
+    "odds_divergence": _odds_divergence_columns,
 }
 
 

@@ -565,3 +565,69 @@ mischaracterizing the result.
   accepting a negative *or* positive result at face value. This is now the
   Stage 2 half of the evidence gate that [[feature_engineering_discipline]]
   and the Stage 0 work only ever described in principle.
+
+## Bookmaker-divergence ablation and the odds-coverage finding (2026-07-04)
+
+**Status: complete.** Chosen via an explicit information-theoretic comparison
+of research directions after the `team_form` result (see project memory)
+— the reasoning: any feature derived purely from public historical results
+is likely already subsumed by the market, so the search should prioritize
+signals that are structurally different in kind, not just another slice of
+the same information. Bookmaker divergence (`div_*`: Bet365 minus
+market-average, de-vigged) was picked as the best cost-adjusted candidate —
+already computed, zero implementation cost, and a meta-signal about
+disagreement between pricing sources rather than another proxy for team
+quality. Tested `Consensus-only` vs. `Consensus+Divergence` vs.
+`Divergence-only`, same `WalkForwardSplit` folds/preprocessing/metrics as
+every prior evaluation, segmented by league, odds band, and market.
+
+### The odds-coverage finding (general — affects ALL future odds-derived research, not just this test)
+
+**Divergence requires both Bet365 and market-average odds to exist for a
+match; market-average coverage is 0% in the training windows for
+`WalkForwardSplit` folds 1-2 (roughly pre-2019).** This means
+`Consensus-only` and `Consensus+Divergence` were **mathematically identical**
+in folds 1-2 (`SimpleImputer` silently drops the all-NaN divergence columns,
+collapsing both configs to the same design matrix — confirmed by identical
+log-loss to 5 decimal places), and `Divergence-only` couldn't be fit at all
+in those folds (zero usable features). **Only folds 3-4 actually tested the
+divergence hypothesis** — half the intended statistical power, silently,
+unless checked for explicitly. This is a general constraint on **any** future
+research using market-average odds or anything derived from cross-bookmaker
+comparison on this dataset as currently imported: expect roughly the first
+half of the walk-forward history to contribute little or nothing to such
+tests, and check for degenerate (identical-output) folds before trusting an
+"inconclusive" result — it may just mean the data wasn't there to test with,
+not that the hypothesis is genuinely untestable.
+
+### Divergence classification
+
+**Not promoted — and deliberately not filed as a clean rejection like
+`team_form`.** Classified precisely as:
+- **Not promoted** — no evidence it adds usable value over consensus odds.
+- **Underpowered due to market-average coverage gaps** — only 2 of 4
+  walk-forward folds provided any real test; the other 2 were degenerate.
+- **Mildly negative on 1x2 where testable** — incremental gain −0.00050
+  (fold 3) and −0.00169 (fold 4); notably, the effect got *more* negative
+  in the fold with *more* divergence coverage (50% vs. 33%), not less —
+  weak evidence this isn't just a data-starvation problem.
+- **Tiny/mixed on ou_2.5** — incremental gain +0.00078 (fold 3), +0.00058
+  (fold 4): small, inconsistent in direction with 1x2, plausibly noise.
+- **Worth revisiting only if historical market-average odds coverage
+  improves, or more bookmaker sources are added** — this is a data
+  availability gate, not a closed research question. Unlike `team_form`
+  (four well-powered, consistently-signed folds — a real null result),
+  divergence's evidence base was too thin to conclude the hypothesis is
+  wrong, only that it isn't currently promotable.
+
+**Secondary finding:** `Divergence-only` (5 columns) clearly underperforms
+`Consensus-only` (44 columns) as expected — but still clearly beats a
+uniform-guess baseline (log_loss 1.06767 vs. ln(3)=1.0986 for 1x2), so
+divergence is not pure noise in isolation, just far less informative than
+price level alone.
+
+**Code:** `src/footpred/ml/models/tabular.py` gained two new resolvable
+feature groups, `odds_consensus` and `odds_divergence` (a partition of
+`odds_core`'s existing columns, not new data) — needed to isolate divergence
+from the price level for this test. 90/90 tests pass (2 new, verifying the
+partition is exact and non-overlapping).

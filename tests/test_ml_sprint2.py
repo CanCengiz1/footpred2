@@ -176,11 +176,16 @@ def test_dataset_build_end_to_end_with_manifest(tmp_path):
     service = EvaluationService(InMemoryMatchOddsReader(uow), out_dir=tmp_path)
     frame, manifest, path = service.build_dataset(train_frac=0.7)
 
-    assert manifest["schema_version"] == "2.0"
+    assert manifest["schema_version"] == "2.1"
     assert manifest["rows"]["total"] == 6
     assert manifest["rows"]["train"] + manifest["rows"]["test"] == 6
     assert set(frame["split"].unique()) <= {"train", "test"}
     assert {"target_1x2", "target_ou_2_5", "target_btts", "target_htft"} <= set(frame.columns)
+    # team identity and raw goals travel into the artifact (needed by
+    # per-team goal models -- target_1x2 alone loses the scoreline)
+    assert {"home_team_id", "away_team_id", "ft_home", "ft_away"} <= set(frame.columns)
+    assert frame["home_team_id"].notna().all() and frame["away_team_id"].notna().all()
+    assert frame["ft_home"].notna().all() and frame["ft_away"].notna().all()
     # HT/FT target None exactly where HT missing (partial + impossible rows)
     assert frame["target_htft"].isna().sum() == 2
     assert (frame["target_htft"].isna() == ~frame["has_ht"]).all()

@@ -33,9 +33,10 @@ from footpred.ml.features.base import FeatureContext, get_feature_group
 from footpred.ml.splits import SingleSplitStrategy, assert_no_leakage
 from footpred.ml.targets import label_1x2, label_btts, label_htft, label_ou25
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
-IDENTITY_COLS = ["match_id", "league_key", "league", "match_date", "has_ht"]
+IDENTITY_COLS = ["match_id", "league_key", "league", "match_date", "has_ht",
+                 "home_team_id", "away_team_id", "ft_home", "ft_away"]
 TARGET_COLS = ["target_1x2", "target_ou_2_5", "target_btts", "target_htft"]
 
 

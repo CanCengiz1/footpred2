@@ -10,5 +10,6 @@ Requires-Dist: alembic>=1.12
 Requires-Dist: streamlit>=1.30
 Requires-Dist: numpy>=1.26
 Requires-Dist: pyarrow>=14.0
+Requires-Dist: scipy>=1.11
 Provides-Extra: dev
 Requires-Dist: pytest>=7.4; extra == "dev"

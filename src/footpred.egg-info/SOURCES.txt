@@ -35,6 +35,7 @@ src/footpred/ml/backtest/simulator.py
 src/footpred/ml/features/__init__.py
 src/footpred/ml/features/base.py
 src/footpred/ml/features/odds_features.py
+src/footpred/ml/features/team_form.py
 src/footpred/services/__init__.py
 src/footpred/services/evaluation_service.py
 src/footpred/services/import_service.py
@@ -48,4 +49,5 @@ tests/test_odds_math.py
 tests/test_pipeline.py
 tests/test_resolution.py
 tests/test_targets_splits.py
+tests/test_team_form.py
 tests/test_validation.py

@@ -631,3 +631,78 @@ feature groups, `odds_consensus` and `odds_divergence` (a partition of
 `odds_core`'s existing columns, not new data) — needed to isolate divergence
 from the price level for this test. 90/90 tests pass (2 new, verifying the
 partition is exact and non-overlapping).
+
+## Cross-market coherence and expanded segmented analysis (2026-07-04)
+
+**Status: complete — diagnostic only, one candidate flagged for its own
+future milestone, nothing promoted.** Run as the "cheap diagnostic pair"
+identified during the post-divergence strategic research-direction review:
+(1) whether the 1x2 and O/U 2.5 markets are mutually coherent, and (2)
+whether segmenting by league/odds-band/time-into-season reveals value the
+pooled `team_form` and divergence ablations missed. Both reused the
+existing `TabularPredictor`/`WalkForwardSplit` harness unchanged; `tabular.py`
+gained one small, disciplined addition — an explicit `extra_columns`
+allowlist parameter, letting one-off engineered analysis columns (like the
+coherence measure below) be tested without prematurely promoting them to a
+registered `FeatureGroup`. 92/92 tests pass.
+
+**Cross-market coherence — primary result: null.** Defined
+`incoherence = actual market P(over 2.5) − 1x2-implied P(over 2.5)`, backing
+out implied (λ, μ) from the 1x2 market via independent-Poisson root-finding
+(deliberately not reusing Dixon-Coles's own fitted ρ, to keep this
+self-contained). Pre-registered O/U 2.5 as the primary target, 1x2 as
+secondary/diagnostic-only. As expected from the general odds-coverage
+finding above, O/U odds don't exist at all pre-2019 (any bookmaker), so
+folds 1-2 were correctly skipped rather than forced — only folds 3-4 tested
+anything. **On the primary O/U target, the effect is negligible in both
+folds** (-0.00073, -0.00005) — no evidence of value, judged by the agreed
+framework (consistency, direction, effect size relative to observed noise)
+rather than a fixed threshold.
+
+**Cross-market coherence — secondary result (1x2): the one live thread,
+explicitly not promoted.** The same incoherence measure showed a
+consistent, positive effect on 1x2 in both folds (+0.00207, +0.00485) —
+larger in magnitude than any effect observed this session, and, unlike
+every noise pattern found so far (the SP1 resilience fluke, the home/away
+split's per-league flukes — all of which *shrank* as more data arrived),
+this one grew from fold 3 to fold 4. The expanded segmented analysis (below)
+found this pattern moderately consistent across league and season-third
+segments too, not concentrated in one slice. **This is being deliberately
+NOT treated as an accepted finding.** It was pre-registered as
+secondary/diagnostic-only, evaluated on the same thin 2-fold evidence base
+as the null primary result, and "an interesting secondary result with a
+plausible story" is exactly the shape of finding the primary/secondary
+pre-registration split exists to keep in check. **Classified as a candidate
+for its own new, freshly pre-registered confirmatory milestone** — 1x2 as
+the primary target next time, its own success/failure criteria decided
+before running, not inherited from this run.
+
+**Expanded segmented analysis — reinforces, does not overturn, the existing
+verdicts:**
+- **`team_form`: the pooled rejection is reinforced, not weakened.** Re-sliced
+  across all 4 folds (full statistical power, unlike the divergence/coherence
+  segments below) by league, odds band, and a new time-into-season tertile
+  axis — every single 1x2 segment is negative; ou_2.5 is negative everywhere
+  except one noisy SP1 cell (mean smaller than its own standard deviation,
+  i.e. not a real effect). No hidden pocket of value found anywhere.
+- **No E1-specific `team_form` effect found — a concrete data point against
+  the long-term roadmap's E1-specific proto-xG bet.** If thinner modeling
+  investment in the Championship let scoreline-derived signal through
+  anywhere, `team_form` would be the place to see it first. It doesn't show
+  up: SP1, not E1, has the least-negative effect on both markets.
+- **Divergence: unchanged.** Re-slicing folds 3-4 (only 2 data points per
+  cell) doesn't add real statistical power — mostly redisplays the same two
+  numbers already reported, grouped differently. Still classified exactly as
+  before: not promoted, underpowered due to coverage, revisit-gated on
+  future coverage improvements.
+- **Coherence, segmented:** primary (O/U) stays negligible everywhere.
+  Secondary (1x2) shows up positively across most league/season-third cells
+  (weakest in E1) — informative for scoping the follow-up milestone, not a
+  basis for promotion on its own.
+
+**How this steers what comes next:** the coherence→1x2 secondary finding is
+the only actionable thread; the next milestone should scope and run a fresh,
+primary-target, pre-registered confirmatory test of it before any promotion
+decision. Everything else (`team_form`, divergence, the E1-inefficiency
+hypothesis) is now on firmer footing to leave as-is than before this
+diagnostic pair was run.

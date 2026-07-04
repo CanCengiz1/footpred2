@@ -148,8 +148,17 @@ class TabularPredictor:
         feature_groups: Sequence[str],
         estimator_factory: Callable[[], TabularEstimator],
         name: str = "Tabular",
+        extra_columns: Sequence[str] = (),
     ):
+        """extra_columns: explicit, named one-off columns to include alongside
+        any resolved feature groups -- still an allowlist (the caller must
+        name them exactly), just for engineered analysis columns that haven't
+        been promoted to a registered FeatureGroup yet (e.g. a derived
+        cross-market-coherence measure). Raises if a named column isn't
+        present in the frame at fit time, same fail-loud convention as
+        resolve_feature_columns."""
         self.feature_groups = list(feature_groups)
+        self.extra_columns = list(extra_columns)
         self._estimator_factory = estimator_factory
         self.name = name
         self._preprocessor: ColumnTransformer | None = None
@@ -159,7 +168,13 @@ class TabularPredictor:
         self._class_order: Dict[str, List[str]] = {}
 
     def fit(self, train: pd.DataFrame) -> "TabularPredictor":
-        self._feature_cols = resolve_feature_columns(train, self.feature_groups)
+        resolved = resolve_feature_columns(train, self.feature_groups) if self.feature_groups else []
+        missing_extra = [c for c in self.extra_columns if c not in train.columns]
+        if missing_extra:
+            raise KeyError(f"extra_columns not present in frame: {missing_extra}")
+        self._feature_cols = resolved + list(self.extra_columns)
+        if not self._feature_cols:
+            raise ValueError("no feature columns resolved -- pass feature_groups and/or extra_columns")
         self._known_leagues = sorted(train[LEAGUE_COL].dropna().unique().tolist())
 
         numeric_pipeline = Pipeline([

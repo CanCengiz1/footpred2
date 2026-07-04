@@ -72,6 +72,26 @@ def test_odds_consensus_and_divergence_partition_odds_core():
     }
 
 
+def test_extra_columns_included_and_missing_ones_raise():
+    train = _synthetic_dataset(n=80, seed=42)
+    train["engineered_signal"] = np.random.rand(len(train))
+
+    predictor = TabularPredictor(feature_groups=[], extra_columns=["engineered_signal"],
+                                  estimator_factory=lambda: LogisticRegression(max_iter=1000))
+    predictor.fit(train)
+    assert predictor._feature_cols == ["engineered_signal"]
+
+    with pytest.raises(KeyError, match="extra_columns not present"):
+        TabularPredictor(feature_groups=[], extra_columns=["nope"],
+                          estimator_factory=lambda: LogisticRegression()).fit(train)
+
+
+def test_no_features_at_all_raises():
+    train = _synthetic_dataset(n=20, seed=43)
+    with pytest.raises(ValueError, match="no feature columns resolved"):
+        TabularPredictor(feature_groups=[], estimator_factory=lambda: LogisticRegression()).fit(train)
+
+
 # --------------------------- fit/predict behavior ---------------------------- #
 
 def _synthetic_dataset(n=200, leagues=("E0", "E1"), seed=0, all_nan_ou_odds=False):

@@ -88,3 +88,33 @@ tests/                  full suite runs without any database
   probabilities as the prediction; the benchmark all models must beat.
 - UI: **Evaluation** page (build dataset → run B0 → de-vig comparison,
   calibration, simulations).
+
+## Sprint 4 (closed): evidence-driven feature research framework
+
+Sprint 4 intentionally produced **no production feature code**. Its
+deliverable was a research framework for evaluating future "Team DNA"
+(team-behavioural) feature candidates before implementation effort goes
+into them:
+
+- **Stage 0 methodology** — a cheap existence test run on data already in
+  hand before any leakage-safe pipeline code is written, refined mid-sprint
+  to a rule that generalizes beyond this sprint: a Stage 0 test must target
+  the exact predictive claim a feature depends on, not a proxy claim (e.g.
+  population-level effect significance) that merely sounds related.
+- **Two feature families tested and paused, not implemented** — team-specific
+  home/away split and halftime resilience — both failed independently
+  designed, pre-registered Stage 0 tests on the current single-season
+  dataset (1,312 matches, E0+E1+SP1). The evidence points at data volume as
+  the limiting factor, not the feature designs.
+- **Paused-feature registry** (see `ROADMAP.md`) — tracks paused families and
+  the retest thresholds (minimum seasons, matches/team, event counts) each
+  one needs before a Stage 0 retest is warranted, so they're revisited as
+  the database grows instead of forgotten.
+- **A strict eligibility gate** — a threshold being crossed only ever
+  triggers a recommendation to rerun Stage 0; a passing retest returns a
+  feature to the implementation backlog, it never triggers implementation
+  directly. See `ROADMAP.md` for the full gate definition.
+
+Next phase: **Data Expansion** — grow the database (depth before breadth,
+football-data.co.uk exhausted before any new provider) so the paused
+registry above has real milestones to evaluate against. See `ROADMAP.md`.

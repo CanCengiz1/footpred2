@@ -5,6 +5,13 @@ and rationale only, so they aren't lost between sprints. Nothing in this file
 should be treated as approved for implementation; each item still needs its
 own explicit go-ahead when picked up.
 
+**Scope note:** this file tracks future milestones and execution history only.
+For accumulated research findings — falsified hypotheses, open questions, and
+the methodology behind them — see
+[`docs/RESEARCH_RETROSPECTIVE.md`](docs/RESEARCH_RETROSPECTIVE.md). Check that
+document before proposing a new research direction; this one is not the place
+to re-derive whether an idea has already been tested.
+
 ## Paused feature registry
 
 **Status: proposed, not implemented.**

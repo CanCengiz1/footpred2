@@ -758,3 +758,43 @@ independence is what matters, not which kind of new data it is. Reclassifies to 
 that replication fails to reproduce the effect. Whenever such data becomes available for any
 reason, rerunning this exact test (unchanged methodology) on the independent portion is the natural
 next occasion — this is not exclusively coupled to a future M3/M4-style data-expansion milestone.
+
+## Draw-tendency residual: closure test for the team-scoreline-derived category (2026-07-04)
+
+**Status: complete — clean rejection, category formally closed.** Scoped explicitly as a closure
+test, not an edge candidate, after a full strategic re-ranking of remaining research directions
+(BTTS/HT-FT wiring downgraded on discovering no BTTS/HT-FT odds exist in the data source at all;
+draw tendency selected as the cheapest remaining test, reusing 100% existing infrastructure — the
+audited Dixon-Coles model, `TabularPredictor`, the 1x2 market already wired).
+
+**Feature and leakage safety:** `src/footpred/ml/models/draw_residual.py` (new, not a registered
+`FeatureGroup`) computes, per fold, one Dixon-Coles fit per league on training data only, then each
+team's mean (actual draw indicator − DC-predicted draw probability), pooled across venue (no
+venue-split, per the agreed scope). Training rows get a leave-one-out average, excluding that
+match's own contribution to its own team's residual — the same self-exclusion discipline
+`team_form`'s `.shift(1)` applies, adapted to a fold-level rather than per-match-rolling
+construction. Test rows use the plain training-window average. 5 new tests cover leave-one-out
+arithmetic, no self-outcome leakage (proven via a mocked-prediction test isolating the algebraic
+cancellation from Dixon-Coles's own fit-sensitivity), test rows depending only on training-window
+residuals, and output shape/bounds correctness. 97/97 tests pass.
+
+**Evaluation:** same 4-fold, full-history `WalkForwardSplit` and `Odds-only` baseline `team_form`
+was tested against, for maximum comparability to the result this closes out — no coverage
+restriction was needed here (unlike the coherence milestones), since 1x2 odds and goals data are
+both available across the full 10-season history.
+
+**Result:** negative incremental gain in all 4 folds at default regularization (magnitudes
+0.00004–0.00244, at or below this project's established noise band). The regularization-sensitivity
+check (C = 0.01–10.0, mirroring `team_form`'s discipline) confirmed the rejection: negative at every
+point in the grid, gap widening (not narrowing) as regularization weakens (−0.00040 at best-C down
+to −0.00268 at C=10) — the same overfitting-to-noise signature seen in `team_form`'s own C-grid. No
+metric supported the candidate (log-loss, Brier, ECE all favored or were indistinguishable in favor
+of Odds-only). A secondary check restricted to draw-specific binary log-loss also worsened in every
+fold — the feature didn't even improve calibration on the one outcome it targeted.
+
+**This formally closes the team-scoreline-derived hypothesis category** — five independently
+designed tests (home/away split, halftime resilience, `team_form`, Dixon-Coles as a standalone
+model, draw-tendency residual), all failed or added no value, several confirmed by a full
+regularization sweep. See `docs/RESEARCH_RETROSPECTIVE.md`'s Core Finding section for what this
+means for future proposals in this category — not automatically disqualified, but requiring a
+specific, articulated reason to expect a different outcome than five-for-five.

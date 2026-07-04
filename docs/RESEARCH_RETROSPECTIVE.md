@@ -47,13 +47,24 @@ The single most important result of this project so far is not any individual fe
 rejection — it is the **convergent, repeated evidence that de-vigged market odds are extremely
 hard to beat with information the market can also see.** Every scoreline-derived signal tested
 (team-specific home/away split, halftime resilience, rolling recent form, Dixon-Coles as a
-standalone goals model) has either failed outright or added no measurable value once market odds
-are present. This is not a string of unrelated negative results — it is the same underlying fact
-surfacing five separate times, through five different experimental designs. It should be treated
-as the project's central empirical finding, and it is the lens every future research direction
-should be evaluated through: **does this introduce information genuinely different from what
-public historical results already encode, or is it another way of re-deriving the same thing the
-market has already priced?**
+standalone goals model, and a Dixon-Coles-residual draw tendency) has either failed outright or
+added no measurable value once market odds are present. This is not a string of unrelated negative
+results — it is the same underlying fact surfacing five separate times, through five different
+experimental designs, each with its own robustness check. It should be treated as the project's
+central empirical finding, and it is the lens every future research direction should be evaluated
+through: **does this introduce information genuinely different from what public historical
+results already encode, or is it another way of re-deriving the same thing the market has already
+priced?**
+
+**The team-scoreline-derived hypothesis category is now formally closed.** Five independently
+designed tests of "does something computable from a team's own historical match results add value
+beyond market odds" have all failed, several with a regularization-sensitivity check confirming
+the rejection wasn't an artifact of one hyperparameter choice. A future proposal in this category
+should not be treated as automatically disqualified — but it should come with a specific,
+articulated reason why it would break a five-for-five pattern, not just optimism that a new
+transform of the same underlying information will fare differently. See
+[Falsified hypotheses](#falsified-hypotheses) for the full account of each test, and the closing
+note there for exactly what would justify reopening this category.
 
 ---
 
@@ -258,6 +269,35 @@ E1 (Championship)-specific effect appeared; if anything SP1 showed the least-neg
 E1. This is relevant evidence (not conclusive) against the long-term roadmap's hypothesis that E1
 is specifically under-modeled relative to E0/SP1 — see [Open and plausible hypotheses](#open-and-plausible-hypotheses).
 
+### Draw tendency as a Dixon-Coles residual — the closure test for this category
+
+**Claim tested:** a team's historical tendency to draw more or less often than the audited
+Dixon-Coles model predicts (a residual — actual draw indicator minus DC's predicted draw
+probability, pooled across venue, leave-one-out on training rows to avoid a match contributing to
+its own feature) carries incremental predictive value beyond de-vigged market odds. Explicitly
+scoped and run as the **final closure test** for the team-scoreline-derived hypothesis category,
+not as a genuine edge candidate — see the Core Finding section above.
+
+**Result:** failed at default regularization — negative incremental gain in all 4 walk-forward
+folds (same 4-fold, full-history split `team_form` was tested on, for maximum comparability),
+magnitudes (0.00004–0.00244) sitting at or below this project's established noise band. The
+regularization-sensitivity check requested for symmetric rigor confirmed it: negative at every
+point across the full C = 0.01–10.0 grid, with the gap **widening** as regularization weakens
+(−0.00040 at the best C for both configs, down to −0.00268 at C=10) — the same
+overfitting-to-noise signature `team_form`'s own C-grid showed. No metric supported the candidate:
+log-loss, Brier, and ECE all favored or were indistinguishable in favor of Odds-only at every
+tested C. A secondary check restricted to draw-specific binary log-loss (the exact class this
+feature targets) also worsened in every fold — the feature doesn't even improve calibration on
+the one outcome it was built to help predict.
+
+**Why considered settled:** consistent negative direction across all 4 folds, a full regularization
+sweep that never reverses and gets worse (not better) with less regularization, agreement across
+three metrics, and a secondary draw-specific check that confirms rather than complicates the
+primary result. The same evidentiary bar `team_form`'s rejection was held to.
+
+**This is the fifth and, for now, final test of the team-scoreline-derived category — see the
+Core Finding section for what this closes and what would be required to reopen it.**
+
 ---
 
 ## Provisionally promoted findings
@@ -365,7 +405,10 @@ be treated as settled.
 
 *(Cross-market coherence, previously listed here as the project's most promising open thread, has
 since been given its own primary-target confirmatory test and reclassified — see
-[Provisionally promoted findings](#provisionally-promoted-findings).)*
+[Provisionally promoted findings](#provisionally-promoted-findings). Draw tendency as a
+Dixon-Coles residual, previously listed here as untested, has since been run as the closure test
+for the team-scoreline-derived category and reclassified — see
+[Falsified hypotheses](#falsified-hypotheses).)*
 
 ### Bookmaker divergence (Bet365 vs. market-average, de-vigged)
 
@@ -375,12 +418,6 @@ walk-forward folds provided a real test (market-average odds are essentially abs
 so this is classified as **underpowered, not rejected**. Revisit if historical market-average
 coverage improves or additional bookmaker sources are added; do not re-run expecting a different
 answer on the same coverage.
-
-### Draw tendency as a Dixon-Coles residual
-
-Flagged in the original Team DNA proposal as viable only once Dixon-Coles's attack/defense/home-
-advantage parameters could be trusted (i.e., only after the audit). Never actually tested — a gap
-in the work, not a finding either way.
 
 ### E1-specific market inefficiency (the basis for a proto-xG investment)
 
@@ -413,9 +450,12 @@ the ideas aren't re-proposed as if new.
   further decay tuning; per-league retuning gained under 0.2%. Its role going forward, if any, is
   as a potential feature input to a richer model, not a continued target of optimization.
 - **Any new feature built purely from historical scorelines** (more rolling windows, ELO-style
-  ratings, alternative decay weightings). `team_form`'s failure has an understood mechanism — the
-  market absorbs anything computable from public historical results — and that mechanism applies
-  to this entire category, not just the one feature actually tested.
+  ratings, alternative decay weightings, further Dixon-Coles residuals). Five independently
+  designed tests — home/away split, halftime resilience, `team_form`, Dixon-Coles as a standalone
+  model, and the draw-tendency residual — have all failed or added no value, several confirmed by
+  a regularization sweep. The category is formally closed (see the Core Finding section); a new
+  proposal here needs a specific reason it would break that pattern, not just a new transform of
+  the same information.
 - **Pure data-volume expansion (further M3/M4-style growth) as an end in itself.** Demonstrated
   directly: fixing Dixon-Coles's two implementation defects mattered far more than a 10x increase
   in training data. More data remains useful for specific, targeted reasons (a richer model that
@@ -450,6 +490,11 @@ Durable tools this research has produced, independent of any single result:
 - **Paused-feature registry design** — documented in `ROADMAP.md`, not yet implemented as running
   code; specifies retest thresholds and a strict eligibility → retest → (pass) → backlog gate that
   never skips straight to implementation.
+- **`draw_residual.py`** — leakage-safe Dixon-Coles-residual feature construction (one DC fit per
+  league per train/test split, leave-one-out on training rows), the tool used for the final
+  team-scoreline-derived closure test. Not a registered `FeatureGroup` (it didn't clear ablation),
+  but reusable machinery if a differently-scoped residual feature is ever proposed with a specific
+  reason to expect a different outcome.
 
 ---
 

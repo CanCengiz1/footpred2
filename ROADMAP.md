@@ -432,3 +432,136 @@ code. Its deliverable was a research framework:
 See project memory (`sprint4_team_dna_proposal`, `sprint4a_resolution`,
 `sprint4b_resolution`, `sprint4_team_dna_paused`, `sprint4_closed`) for the
 full analysis trail. Next: Data Expansion phase, above.
+
+## TabularPredictor milestone and the team_form ablation (2026-07-04)
+
+**Status: milestone complete, ablation complete, decision made.** This
+section is split into three explicitly separate parts, per how the work
+was actually done: a new framework capability, a specific empirical result
+produced using it, and the decision that result justifies. Keep these
+separate when citing this section — the milestone is a standing capability
+regardless of any one ablation's outcome; the ablation result is specific
+to `team_form` and does not need to be revisited every time the framework
+is used for a different feature family.
+
+### 1. The TabularPredictor milestone
+
+Resolved the structural gap flagged repeatedly since Sprint 4 (no
+feature-consuming model existed to run a real Stage 2 ablation against —
+B0 only reads odds, Dixon-Coles only reads goals history, `team_form` sat
+in every dataset build unused by anything). Built a generic, pluggable
+tabular-model `Predictor`:
+
+- **Dependency added:** `scikit-learn>=1.3` (`pyproject.toml`), same
+  addition pattern as `scipy` for Dixon-Coles.
+- **`src/footpred/ml/models/tabular.py`:** two-layer design.
+  `TabularEstimator` is the pluggable inner contract, deliberately shaped
+  to match the sklearn classifier convention (`fit`/`predict_proba`/
+  `classes_`) so sklearn, XGBoost, LightGBM, and CatBoost's
+  sklearn-compatible classes all satisfy it with zero adapter code.
+  `TabularPredictor` is the outer `Predictor`-protocol implementer: explicit
+  feature-column allowlisting (derived from each feature group's own
+  published naming constants, never "everything except known targets"),
+  one shared preprocessing pipeline (median-impute -> one-hot `league_key`
+  -> scale, fit on train only), one estimator per market, output columns
+  reindexed into `BacktestRunner`'s required selection order regardless of
+  the estimator's own `classes_` order. Pools across leagues (unlike
+  Dixon-Coles's per-league fit) — `league_key` is a feature, not a
+  model-fitting boundary.
+- **No changes to `BacktestRunner`, `DatasetBuilder`, or `splits.py`** —
+  same zero-framework-change integration Dixon-Coles proved out in Sprint 3B.
+- **Tests: 89/89 pass** (78 pre-existing + 11 new in `tests/test_tabular.py`):
+  leakage-guard (allowlist proven safe against an adversarial frame), train-
+  only preprocessing statistics, unseen-league abstention, unseen-team
+  *non*-abstention (a genuine advantage over Dixon-Coles — team identity
+  isn't a raw feature here, so a brand-new team just gets imputed form
+  stats), output-column reindexing against a deliberately-scrambled fake
+  estimator, probabilities-sum-to-1, an obviously-learnable-pattern smoke
+  test, and an end-to-end unmodified-`BacktestRunner` wiring test.
+- **Leakage-safe walk-forward evaluation confirmed working:** ran the
+  project's own `assert_no_leakage` guard explicitly against every
+  `WalkForwardSplit` fold used in this and the Dixon-Coles evaluation —
+  passed globally and per-league on all 4 folds (this check had been
+  trusted but not explicitly run earlier in the session).
+- **Coverage finding (documented, not fixed — out of this milestone's
+  scope):** market-average and all ou_2.5 odds are 0% covered in the
+  earliest two walk-forward folds (train windows ending 2019), then
+  partially covered (33% -> 50%) as later folds extend past it — consistent
+  with the M2 addendum's older-file-format finding. `SimpleImputer` silently
+  drops an entirely-uncovered column from its output rather than erroring;
+  confirmed non-crashing via a dedicated test, but the effective feature
+  count does shrink in those folds for the affected columns.
+
+First head-to-head result with everything included (`odds_core`+`team_form`
+vs. B0 vs. corrected Dixon-Coles, mean across 4 folds): Tabular's 1x2
+log-loss (0.99875) sits between B0 (0.99358) and Dixon-Coles (1.02878) —
+beats DC decisively on log-loss/Brier every fold/market, closes roughly 85%
+of DC's gap to B0. (Calibration specifically was mixed: DC's ECE edged
+Tabular's in the two most recent, largest-training folds, where DC's
+time-decay fix had its biggest calibration benefit.) This result mixes
+`odds_core` and `team_form` together, which is exactly why the ablation
+below was needed before drawing any conclusion about `team_form` itself.
+
+### 2. The team_form ablation result
+
+Compared `Odds-only`, `Form-only`, and `Odds+Form` head to head (same
+`WalkForwardSplit` folds, same preprocessing, same metrics), then reran
+`Odds-only` vs. `Odds+Form` across a `C` grid ([0.01, 0.03, 0.1, 0.3, 1.0,
+3.0, 10.0]) to make sure an untuned default regularization wasn't
+mischaracterizing the result.
+
+- **Odds-only beats Odds+Form on the primary 1x2 market — consistently,
+  not marginally.** At default `C=1.0`: mean log-loss 0.99618 (Odds-only)
+  vs. 0.99875 (Odds+Form), a gap present in **all 4 folds** (deltas
+  -0.00296, -0.00433, -0.00193, -0.00108 — always the same sign, never
+  flipping). At each config's own best `C` (both preferred `C=0.01`, the
+  most-regularized point tested): gap narrows to -0.00141 mean but **stays
+  negative in all 4 folds**.
+- **`team_form` alone (Form-only) does carry real signal** — clearly beats
+  a naive uniform-probability baseline (mean 1x2 log-loss 1.03528, vs.
+  ln(3)=1.0986 for a coin-flip-equivalent guess) — but that signal does
+  **not add marginal value once odds are present**.
+- **C-grid retuning does not rescue `team_form` — the finding is reinforced,
+  not weakened.** Swept `Odds+Form` across the entire `C` grid against
+  `Odds-only`'s own best `C`: the gap is negative at every single tested
+  `C` (-0.00141 at C=0.01, widening to -0.00492 at C=10.0) — there is no
+  regularization strength in a 1000x range where adding `team_form` helps
+  the primary market.
+- **`ou_2.5` is effectively neutral/noise-level, not a supporting result for
+  `team_form`.** At default C, the gap is small and consistently negative
+  (-0.00082 mean); at each config's best C, it's a wash — tiny positive in
+  2 of 4 folds, tiny negative in 2, magnitudes (~0.0002) indistinguishable
+  from noise. This market simply doesn't provide evidence either way.
+- **Coefficient interpretation (fold 4, largest training set, 1x2):** in
+  Form-only, the strongest features are goal-scoring-rate stats
+  (`home_form_gf_last10`, `home_form_gd_last10`, `away_form_gf_last10`),
+  all correctly signed. In Odds+Form, those same coefficients collapse
+  (`home_form_gf_last10`: 0.084 -> 0.011, ~87% shrinkage) — most of
+  `team_form`'s apparent signal is a subset of what market odds already
+  encode. What little remains shifts toward sample-count features
+  (`away_form_n_last5/10`), a plausible (not confirmed) residual
+  "how much history do we have on this team" signal rather than a
+  performance signal.
+
+### 3. The decision
+
+- **Current `team_form` features (rolling pts/gf/ga/gd/n, last-5/last-10,
+  both sides) should NOT be promoted as value-adding features on top of
+  odds.** This is the first real Stage 2 ablation result in the project's
+  history — Sprint 4's whole paused-feature-registry effort never had a
+  tool to reach this stage before. `team_form` stays in the codebase
+  (it's still used and tested elsewhere, e.g. Dixon-Coles doesn't use it,
+  but nothing here removes the feature group itself) — it's just not
+  being promoted as improving the 1x2/ou_2.5 prediction task over odds
+  alone.
+- **`TabularPredictor` is kept as an important new framework capability,
+  independent of this specific result.** It's the first working Stage 2
+  ablation tool this project has had; its value doesn't depend on
+  `team_form` in particular passing or failing.
+- **Future feature work must clear this same ablation pattern before being
+  promoted** — Odds-only vs. Odds+candidate-feature, same walk-forward
+  folds, checked for consistency across folds (not just a mean), and a
+  brief regularization-sensitivity check (a small `C`-style sweep) before
+  accepting a negative *or* positive result at face value. This is now the
+  Stage 2 half of the evidence gate that [[feature_engineering_discipline]]
+  and the Stage 0 work only ever described in principle.

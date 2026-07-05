@@ -118,3 +118,40 @@ into them:
 Next phase: **Data Expansion** — grow the database (depth before breadth,
 football-data.co.uk exhausted before any new provider) so the paused
 registry above has real milestones to evaluate against. See `ROADMAP.md`.
+
+## Canonical Prediction Engine (docs/VISION.md made runnable)
+
+Turns the product vision into running code: one canonical FootPred
+prediction per match, built as an evidence-tier-weighted blend of the
+promoted baseline and any live findings, via logarithmic opinion pooling
+(weighted sum in logit space, softmax-renormalized). Market-agnostic by
+construction — every quantity is indexed by `MARKETS[market]["selections"]`,
+so 1x2 today and btts/ou/htft later need no engine change.
+
+- `footpred.ml.evidence` — the findings registry (`configs/findings_registry.json`)
+  and the fixed, pre-registered tier weights (rejected/not_confirmed = 0,
+  provisionally_promoted = 0.25, promoted = 1.0).
+- `footpred.ml.models.coherence` — `compute_coherence_features`: the
+  cross-market-coherence signal (see `docs/RESEARCH_RETROSPECTIVE.md`)
+  reimplemented as reusable, tested code — it previously existed only as
+  uncommitted analysis code, closing a reproducibility gap found while
+  scoping this milestone.
+- `footpred.ml.models.canonical.CanonicalPredictor` — the engine itself.
+  `predict_proba(market, X)` (the canonical number) plugs into
+  `BacktestRunner` unchanged; `explain(market, X)` returns the full audit
+  record — baseline, canonical, and the internal promoted-only
+  counterfactual that lets a provisionally-promoted finding's forward
+  production performance be re-tested for independent replication without
+  ever being shown to a user.
+- `footpred.ml.predictions_log` — persists `explain()`'s output as a
+  long-format artifact (`data/predictions/`, Parquet + manifest, same
+  content-hash discipline as `datasets.py`) — one row per
+  (match, role/finding, selection), so adding a market with a different
+  outcome count never needs a schema change, mirroring the `odds` table's
+  own long-format design.
+- Today the registry holds exactly one finding (`coherence_1x2`,
+  provisionally promoted, 1x2 only), so the canonical prediction is a small
+  shrunk nudge on top of the de-vigged market baseline — B0 remains the
+  anchor, per `docs/VISION.md`. Backtest/offline mode only; live-mode
+  ingestion and the DB-backed predictions table are designed in
+  `docs/VISION.md` but not built yet. 37 new tests (134/134 total).

@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "findings": [
+    {
+      "finding_id": "coherence_1x2",
+      "tier": "provisionally_promoted",
+      "market": "1x2",
+      "extra_columns": ["incoherence_ou25"],
+      "description": "Cross-market incoherence (actual O/U-2.5 market price minus the 1x2 market's rho-corrected implied O/U probability) as a predictive signal for the 1x2 market.",
+      "retrospective_anchor": "docs/RESEARCH_RETROSPECTIVE.md#corrected-confirmatory-1x2-coherence-milestone-2026-07-04--provisionally-promoted"
+    }
+  ]
+}

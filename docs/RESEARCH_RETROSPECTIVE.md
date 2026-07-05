@@ -25,6 +25,11 @@ updated after every experiment — that is what `ROADMAP.md` and project memory 
 version is the initial retrospective, written after the Data Expansion phase, the Dixon-Coles
 audit, the `TabularPredictor` milestone, and the first round of Stage 2 ablations.
 
+For how these findings feed into the product — the evidence-exposure gate that maps each tier
+here to how much influence a finding has on the canonical FootPred prediction, and the
+pre-registered criteria for validating the product itself — see
+[`docs/VISION.md`](VISION.md).
+
 ---
 
 ## Table of contents

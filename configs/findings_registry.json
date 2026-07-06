@@ -3,11 +3,11 @@
   "findings": [
     {
       "finding_id": "coherence_1x2",
-      "tier": "provisionally_promoted",
+      "tier": "not_confirmed",
       "market": "1x2",
       "extra_columns": ["incoherence_ou25"],
-      "description": "Cross-market incoherence (actual O/U-2.5 market price minus the 1x2 market's rho-corrected implied O/U probability) as a predictive signal for the 1x2 market.",
-      "retrospective_anchor": "docs/RESEARCH_RETROSPECTIVE.md#corrected-confirmatory-1x2-coherence-milestone-2026-07-04--provisionally-promoted"
+      "description": "Cross-market incoherence (actual O/U-2.5 market price minus the 1x2 market's rho-corrected implied O/U probability) as a predictive signal for the 1x2 market. Reclassified not_confirmed 2026-07-06: independent replication on the newly imported 2025/26 season failed to reproduce the effect (negative incremental gain at default C, sign unstable across the C-grid).",
+      "retrospective_anchor": "docs/RESEARCH_RETROSPECTIVE.md#cross-market-coherence--1x2-%CF%81-corrected--reclassified-2026-07-06"
     }
   ]
 }

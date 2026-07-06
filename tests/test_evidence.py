@@ -43,9 +43,13 @@ def test_load_registry_from_real_config_file():
     findings = load_registry()
     assert any(f.finding_id == "coherence_1x2" for f in findings)
     coherence = next(f for f in findings if f.finding_id == "coherence_1x2")
-    assert coherence.tier == "provisionally_promoted"
+    # not_confirmed since 2026-07-06: independent replication against the
+    # newly imported 2025/26 season failed to reproduce the effect (see
+    # docs/RESEARCH_RETROSPECTIVE.md, "Not confirmed findings").
+    assert coherence.tier == "not_confirmed"
     assert coherence.market == "1x2"
     assert coherence.extra_columns == ["incoherence_ou25"]
+    assert coherence.is_live is False
 
 
 def test_load_registry_from_tmp_file(tmp_path):
@@ -82,7 +86,9 @@ def test_promoted_only_excludes_provisional():
 
 
 def test_promoted_only_empty_when_nothing_promoted_yet():
-    """Today's actual state: one provisionally-promoted finding, zero
-    promoted -- the degenerate case docs/VISION.md describes."""
+    """Today's actual state: coherence_1x2 is not_confirmed (reclassified
+    2026-07-06), so both the promoted and provisionally-promoted sets are
+    empty -- the degenerate case docs/VISION.md describes."""
     findings = load_registry()
     assert promoted_only(findings, "1x2") == []
+    assert live_findings(findings, "1x2") == []

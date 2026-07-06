@@ -37,12 +37,13 @@ pre-registered criteria for validating the product itself — see
 1. [Core finding](#core-finding)
 2. [Research methodology](#research-methodology)
 3. [Falsified hypotheses](#falsified-hypotheses)
-4. [Provisionally promoted findings](#provisionally-promoted-findings)
-5. [Corrected engineering findings (not hypotheses)](#corrected-engineering-findings-not-hypotheses)
-6. [Open and plausible hypotheses](#open-and-plausible-hypotheses)
-7. [Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out)
-8. [Standing infrastructure and capabilities](#standing-infrastructure-and-capabilities)
-9. [How to use this document](#how-to-use-this-document)
+4. [Not confirmed findings](#not-confirmed-findings)
+5. [Provisionally promoted findings](#provisionally-promoted-findings)
+6. [Corrected engineering findings (not hypotheses)](#corrected-engineering-findings-not-hypotheses)
+7. [Open and plausible hypotheses](#open-and-plausible-hypotheses)
+8. [Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out)
+9. [Standing infrastructure and capabilities](#standing-infrastructure-and-capabilities)
+10. [How to use this document](#how-to-use-this-document)
 
 ---
 
@@ -305,6 +306,75 @@ Core Finding section for what this closes and what would be required to reopen i
 
 ---
 
+## Not confirmed findings
+
+Results classified under the fourth tier's negative outcome (see
+[Research methodology](#research-methodology)): a provisionally promoted result for which
+independent replication was attempted and failed to reproduce the effect. Treated with the same
+respect as any other null result, not silently retried until it works.
+
+### Cross-market coherence → 1x2 (ρ-corrected) — reclassified 2026-07-06
+
+**Original claim (provisionally promoted 2026-07-06, this same day, on independent replication):**
+whether the O/U-2.5 market's price disagrees with what the 1x2 market's implied scoreline
+distribution predicts, computed via the audited (τ-corrected, ρ-fitted) Dixon-Coles model. See the
+"Design" and original "Result" below for the discovery run this replication attempt tested against.
+
+**Original design (discovery run):** evaluated on "matches with usable 1x2 + O/U bet365 odds" —
+7,870 matches, 2019-08-02 to 2025-05-25, all three leagues — using 5 expanding `WalkForwardSplit`
+folds. Primary (1x2): incremental gain positive in 4 of 5 folds (mean +0.00246 at default
+regularization); C-grid (0.01–10.0) never collapsed or reversed (mean gain 0.00213–0.00238 across
+the whole grid); Brier and ECE both improved alongside log-loss at best C. Secondary (O/U 2.5)
+stayed null throughout. This was judged the most consistent, most metric-coherent positive result
+the project had produced — but explicitly *not yet independently replicated*, hence provisional.
+
+**Replication design, run the same day the 2025/26 season was imported:** same feature definition
+(`compute_coherence_features`, unchanged), same restriction criterion (usable bet365 1x2 + O/U 2.5
+odds — reapplying it to the enlarged database reproduced the identical 7,870-match, 2019-08-02–
+2025-05-25 population exactly, confirming the restriction is deterministic, not redrawn ad hoc).
+Train = that entire original-discovery-era population (rho fit on training-window goals history
+only, per the existing leakage-safe convention); test = the newly imported 2025/26 season only
+(1,312 matches: E0 380, E1 552, SP1 380 — zero role in the original discovery, imported and
+verified via `ImportPipeline` the same session). This single held-out-season design was chosen over
+re-running the 5-fold `WalkForwardSplit` over the enlarged population because the latter would
+remix pre-existing and new data across folds, diluting the one property an independent-replication
+check actually needs — a test set the original search never touched.
+
+**Result:**
+- Primary (1x2), default regularization: incremental gain **−0.00031** (baseline log-loss 1.02766,
+  candidate 1.02797) — negative, the opposite sign from the discovery run's mean. Brier
+  (0.61822 → 0.61850) and ECE (0.02487 → 0.02536) both worsened for the candidate too — full
+  3-metric agreement on the negative direction, same kind of agreement the discovery run had used
+  as supporting evidence in the other direction.
+- **C-grid check** (C = 0.01–10.0, identical grid to the discovery run): sign is **not stable** —
+  +0.00018 (0.01), +0.00035 (0.03), −0.00023 (0.1), −0.00026 (0.3), −0.00031 (1.0), +0.00162 (3.0),
+  +0.00007 (10.0). This is the opposite of the discovery run's "never collapses or reverses"
+  pattern — here the sign flips repeatedly across the grid, the signature of a coefficient tracking
+  noise rather than a stable effect.
+- Not a degenerate fit: `incoherence_ou25` carries real, similar-scale variation in both populations
+  (train mean 0.0618/std 0.0426; test mean 0.0554/std 0.0421) and the candidate model's fitted
+  coefficient on it is non-zero and differs by class (away +0.0040, draw −0.0375, home +0.0336) —
+  the negative result is not an artifact of a missing or constant feature.
+- All effect magnitudes here (≤0.0016 in absolute value) sit inside the ~0.0005–0.005 noise band
+  this project has repeatedly observed elsewhere, the same band the discovery run's own effect size
+  had been noted as sitting only at the edge of, not clearly beyond.
+
+**Why this counts as a failed replication, not just an underpowered check:** the pre-registered
+confirmation path (see [Research methodology](#research-methodology)) commits to reclassifying to
+not confirmed specifically when independent data fails to reproduce the effect — it does not carve
+out an exception for a single-season replication set being smaller than the original 5-fold
+evaluation. The single new season is comparable in size to one discovery-run fold (~1,574 matches
+each), so it is not a token or trivially underpowered check; the sign instability across the entire
+C-grid is itself informative, not just the point estimate at default C.
+
+**Reclassified: not confirmed.** Per the tier's own definition, this does not disqualify the
+underlying idea from ever being revisited, but it is not currently an active candidate and should
+not be re-proposed as if it were still provisional. A future attempt would need a specific,
+articulated reason the earlier failure doesn't apply — not just more data of the same kind, given
+one more season did not go the discovery run's direction.
+
+---
+
 ## Provisionally promoted findings
 
 Results classified under the fourth tier defined in [Research methodology](#research-methodology):
@@ -312,55 +382,9 @@ robustness-checked and positive, but not yet independently replicated. See that 
 what "provisionally promoted," "promoted," and "not confirmed" mean and how one graduates to
 another.
 
-### Cross-market coherence → 1x2 (ρ-corrected)
-
-**Claim tested:** whether the O/U-2.5 market's price disagrees with what the 1x2 market's implied
-scoreline distribution predicts — with that implied distribution now computed via the *audited*
-Dixon-Coles model (τ-corrected, using each fold's leakage-safe fitted per-league ρ), superseding an
-earlier diagnostic run that had assumed independence (ρ=0). 1x2 was pre-registered as the primary
-target this time (it had only ever been tested as a secondary/diagnostic endpoint before).
-
-**Design:** evaluated on the explicit test population of "matches with usable 1x2 + O/U bet365
-odds" — 7,870 matches, 2019-08-02 to 2025-05-25, all three leagues consistently covered — rather
-than the full 10-season database. This restriction was decided *before* running anything, not
-discovered after: O/U odds (any bookmaker) are structurally absent before ~2019, a fact already on
-record from the divergence ablation, so reusing the standard 4-fold split over the full history
-would have wasted two folds that cannot test this hypothesis at all. Within the restricted, fully
-informative population, 5 expanding `WalkForwardSplit` folds were used (~1 season/block) instead of
-2 real folds out of 4 — more statistical power at the same computational cost, at the price of
-comparability to prior tests' exact fold structure. Dixon-Coles's ρ itself was fit on full goal
-history (it needs no odds), cut off leakage-safely at each fold's test-window start.
-
-**Result:**
-- Primary (1x2): incremental gain positive in 4 of 5 folds (−0.00063, +0.00241, +0.00189, +0.00552,
-  +0.00309; mean +0.00246 at default regularization).
-- The ρ-correction changed very little versus the original independence assumption (mean gain
-  +0.00278 under ρ=0 on the identical folds) — the theoretical concern that motivated this milestone
-  was worth checking rigorously, but the fitted ρ values turned out small enough that it wasn't a
-  major confound in practice.
-- **C-grid check** (C = 0.01 to 10.0, mirroring the `team_form` discipline exactly): best C=0.01 for
-  both baseline and candidate; the effect **never collapsed or reversed** across the full grid
-  (mean gain 0.00213–0.00238), and the same 4-of-5 sign pattern held at every single point in the
-  grid, not just at best-C. Brier and ECE both improve alongside log-loss at best C.
-- Secondary (O/U 2.5) stayed null throughout, consistent with every prior run.
-
-**Why provisionally promoted, not promoted or rejected:** this is the most consistent, most
-metric-coherent, most regularization-stable positive result the project has produced — clearly
-stronger than the underpowered divergence/original-coherence results, and it does not collapse under
-a robustness check the way a spurious effect would. But it falls short of the confidence bar
-`team_form`'s rejection earned: one fold (the earliest, smallest-history fold) consistently
-disagrees rather than 100% consistency; the mean effect size sits at the edge of, not clearly beyond,
-the ~0.0005–0.005 noise band this project has repeatedly observed; the evaluation is necessarily
-restricted to the post-2019 odds-covered subset, not the full history; and with only 2-3 features in
-play, the C-grid here is a structurally weaker stress test than it was for `team_form`'s 49+ feature
-ablation, so "survived the C-grid" carries less evidentiary weight than the same phrase did there.
-
-**Confirmation path:** promotes to fully **promoted** if independently replicated — same feature
-definition, same methodology — on any data that played no role in discovering this signal (new
-seasons once imported, additional leagues, or a different compatible dataset; independence is what
-matters, not which of these it is). Reclassifies to **not confirmed** if that replication fails to
-reproduce the effect. Until then, usable as an active candidate in further experiments, not treated
-as an established finding.
+**Currently empty.** Cross-market coherence → 1x2 was the only finding in this tier; it has been
+reclassified to **not confirmed** (see [Not confirmed findings](#not-confirmed-findings)) after its
+first independent-replication attempt, run against the newly imported 2025/26 season.
 
 ---
 
@@ -511,10 +535,10 @@ Before proposing a new research direction or feature:
    idea is "another way of deriving signal from historical scorelines," the `team_form` mechanism
    almost certainly applies — that is not a reason to skip testing it, but it is a reason to expect
    a null result and to say so before running the test.
-2. **Check the provisionally promoted section** before treating a live candidate as either fully
-   established or non-existent — and if independent data becomes available for any reason, that is
-   the occasion to attempt the confirmation check described there, not something to defer
-   indefinitely.
+2. **Check the provisionally promoted and not-confirmed sections** before treating a live candidate
+   as either fully established or non-existent — and if independent data becomes available for any
+   reason, that is the occasion to attempt the confirmation check described there, not something to
+   defer indefinitely.
 3. **Check the open-hypotheses section** before re-deriving a question that's already
    mid-investigation — extend that thread rather than starting a parallel one.
 4. **Check the deprioritized section** for ideas already reasoned away, so the reasoning gets

@@ -28,9 +28,11 @@ The honest current state, as of the retrospective's Core Finding:
   closed.
 - **The de-vigged market baseline (B0) is undefeated.** Every model built so far — Dixon-Coles,
   TabularPredictor with every feature tried — loses to it on every metric, every fold.
-- **Exactly one finding is provisionally promoted** (cross-market coherence → 1x2), meaning:
-  robustness-checked and positive, but evaluated on a single body of data and not yet independently
-  replicated. It is a live candidate, not an established edge.
+- **No finding is currently provisionally promoted or promoted.** Cross-market coherence → 1x2, the
+  one candidate that had reached provisional status, was reclassified **not confirmed** on
+  2026-07-06 after independent replication against the newly imported 2025/26 season failed to
+  reproduce the effect. The canonical prediction currently reduces to the de-vigged market baseline
+  alone (B0) — no live evidence-tier finding is contributing weight.
 - **There are no users and no product surface today** beyond a local Streamlit research console
   used to build datasets and run backtests.
 
@@ -81,9 +83,11 @@ failed, plus whatever is currently being tested live. That is a distinct, defens
 one with zero proven edge, precisely because it doesn't pretend otherwise.
 
 **This is a starting point, not FootPred's long-term identity.** Today the formula above
-degenerates to `canonical prediction = market baseline`, because the "promoted" set is empty and
-the "provisionally promoted" set holds one unreplicated candidate. As research matures, the intent
-is for it to become a genuine three-term prediction:
+degenerates to `canonical prediction = market baseline`, because both the "promoted" and
+"provisionally promoted" sets are empty — the one candidate that had reached provisional status
+(cross-market coherence → 1x2) was reclassified not confirmed on 2026-07-06 (see
+`docs/RESEARCH_RETROSPECTIVE.md`). As research matures, the intent is for it to become a genuine
+three-term prediction:
 
 ```
 FootPred Prediction = Market Baseline + Confirmed Signals + Weighted Experimental Signals

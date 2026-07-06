@@ -101,6 +101,42 @@ closing-line value (CLV) becomes computable, the standard sharp-betting benchmar
 a candidate future addition to `docs/VISION.md`'s validation criteria; Asian Handicap as FootPred's
 second real predictable market.
 
+## 2025/26 season import and coherence-finding independent replication (2026-07-06)
+
+**Status: DONE.** football-data.co.uk's 2025/26 E0/E1/SP1 files (complete seasons, 2025-08-08 to
+2026-05-24) imported cleanly via `ImportPipeline`: **1,312 matches added (E0 380, E1 552, SP1 380),
+zero rejected, zero duplicates.** DB now at 14,432 matches. A pre-import backup was taken
+(`footpred.db.bak-20260706180315-pre2526`); the existing `footpred.db.bak-20260706143621` (pre
+Pinnacle/AH backfill) is retained until this milestone is fully confirmed, per standing agreement.
+
+**Bug found and fixed before the replication could be trusted:** `SqlMatchOddsReader`'s raw odds
+pivot (`odds_<market>_<selection>_<bookmaker>`) has no `price_point`/`line` dimension in its column
+key, so a closing quote sharing (match, market, selection, bookmaker) with its opening counterpart
+— exactly what the Pinnacle/AH backfill above introduces — would silently collide under
+`pivot_table(aggfunc="first")`. Verified against the real DB this had so far resolved to the
+opening value on all 7,763 checked rows, but only by insertion-order luck (opening always inserted
+before closing), not by design — undefined SQL row-order behavior, not a guarantee. Fixed:
+`price_point`-qualified quotes are now explicitly excluded from this reader (matches the documented
+single-snapshot scope `odds_core` already assumes); regression test added
+(`test_read_model_excludes_closing_quotes_from_the_raw_pivot`). 149/149 tests pass.
+
+**Coherence replication, run against the newly independent 2025/26 season:** same feature
+definition (`compute_coherence_features`), same restriction criterion as the original discovery
+(usable bet365 1x2 + O/U 2.5 odds — re-deriving it against the enlarged DB reproduced the exact
+same 7,870-match, 2019-08-02–2025-05-25 training population, confirming the restriction is
+deterministic). Train = the entire original-discovery-era population; test = the 1,312 newly
+imported 2025/26 matches only, zero role in the original discovery. **Result: primary (1x2)
+incremental gain −0.00031 at default C (opposite sign from the discovery run's +0.00246 mean);
+Brier and ECE both worsened too; the C-grid (0.01–10.0) showed an unstable sign** (+, +, −, −, −,
++, + across the grid) rather than the discovery run's "never collapses or reverses" pattern. **The
+finding was reclassified `not_confirmed`** in `configs/findings_registry.json` and
+`docs/RESEARCH_RETROSPECTIVE.md` (new "Not confirmed findings" section) — it no longer contributes
+to the canonical prediction (`is_live=False`). Full write-up, including the coefficient/variance
+sanity checks confirming this wasn't a degenerate fit: `docs/RESEARCH_RETROSPECTIVE.md`.
+
+`docs/VISION.md` updated to match: the canonical prediction currently reduces to the de-vigged
+market baseline alone, with no live evidence-tier finding.
+
 ## High-HT/FT Pattern Model (future research direction)
 
 **Status: proposed, not implemented — recorded 2026-07-06.** Deliberately tracked separately from

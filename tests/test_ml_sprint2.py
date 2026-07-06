@@ -55,6 +55,25 @@ def test_read_model_pivots_odds_wide():
     assert arsenal["away_team_id"] == chelsea_id
 
 
+def test_read_model_excludes_closing_quotes_from_the_raw_pivot():
+    """A closing quote shares (match, market, selection, bookmaker) with its
+    opening counterpart -- the pivot key has no price_point dimension. Without
+    filtering, pivot_table(aggfunc="first") would arbitrarily pick one; this
+    asserts the opening value always wins because closing is excluded
+    entirely, not because of insertion-order luck."""
+    from footpred.domain.entities import OddsQuote
+
+    uow = _seeded_uow()
+    match_id = next(iter(uow.matches._items)).id
+    uow.odds.add_many([
+        OddsQuote(id=None, match_id=match_id, bookmaker="bet365", market="1x2",
+                  selection="home", decimal_odds=999.0, price_point="closing"),
+    ])
+    frame = InMemoryMatchOddsReader(uow).load_completed()
+    row = frame[frame["match_id"] == match_id].iloc[0]
+    assert row[odds_col("1x2", "home", "bet365")] != 999.0
+
+
 # --------------------------- features ------------------------------------- #
 
 def test_odds_feature_group_columns_and_values():

@@ -11,6 +11,15 @@ Canonical frame columns:
   odds_<market>_<selection>_<bookmaker>   (float, NaN when unquoted;
                                            '.' in market names -> '_',
                                            e.g. odds_ou_2_5_over_bet365)
+
+This pivot key has no price_point/line dimension, so it can only represent
+one quote per (match, market, selection, bookmaker) -- the original
+single-snapshot convention. Since Pinnacle/Asian-Handicap backfill can add a
+second quote for the same key (e.g. bet365 1x2 closing alongside opening,
+same bookmaker/market/selection, differing only by price_point), quotes with
+a non-None price_point are excluded here entirely rather than silently
+colliding under pivot_table's aggfunc="first". Opening/closing and AH-line
+features are future feature-group work (see ROADMAP.md), not this read model.
 """
 from __future__ import annotations
 
@@ -59,7 +68,8 @@ def frame_from_records(
     quotes = pd.DataFrame(
         [{"match_id": q.match_id,
           "col": odds_col(q.market, q.selection, q.bookmaker),
-          "price": q.decimal_odds} for q in odds]
+          "price": q.decimal_odds} for q in odds
+         if q.price_point is None]
     )
     if not quotes.empty:
         wide = quotes.pivot_table(index="match_id", columns="col",
@@ -102,8 +112,9 @@ class SqlMatchOddsReader:
             leagues = [_league(r) for r in s.scalars(select(m.LeagueRow))]
             odds_rows: List[Tuple] = s.execute(
                 select(m.OddsRow.match_id, m.OddsRow.bookmaker, m.OddsRow.market,
-                       m.OddsRow.selection, m.OddsRow.decimal_odds)
+                       m.OddsRow.selection, m.OddsRow.decimal_odds, m.OddsRow.price_point)
             ).all()
         odds = [OddsQuote(id=None, match_id=r[0], bookmaker=r[1], market=r[2],
-                          selection=r[3], decimal_odds=r[4]) for r in odds_rows]
+                          selection=r[3], decimal_odds=r[4], price_point=r[5])
+                for r in odds_rows]
         return frame_from_records(matches, odds, leagues)

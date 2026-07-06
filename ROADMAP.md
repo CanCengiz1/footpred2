@@ -15,6 +15,177 @@ and the milestones below are ultimately building toward — the product vision,
 the evidence-exposure gate, and the validation criteria that gate any move
 toward monetization — see [`docs/VISION.md`](docs/VISION.md).
 
+## Multi-market expansion and system/combination builder
+
+**Status: proposed, not implemented — architectural note only, recorded 2026-07-06 so it isn't
+lost before workspace design happens.**
+
+**Long-term product scope (see `docs/VISION.md`):** FootPred should eventually support 1x2,
+O/U 2.5, O/U 3.5, BTTS, and HT/FT probability views, plus a dedicated "High-HT/FT" research layer
+that detects whether specific odds-structure/team-identity/other-market signals make a particular
+high-odds HT/FT selection more likely than a baseline implies, surfaced at whatever evidence tier
+it earns — never as an unvetted high-odds recommendation.
+
+**Verified, not assumed: the Canonical Prediction Engine already supports this without redesign.**
+`CanonicalPredictor`, `evidence.py`, and `predictions_log.py` are market-agnostic by construction
+(proven by tests using synthetic 2- and 4-outcome fake markets, not just 1x2/O-U-2.5) — adding a
+market is an entry in `MARKETS` plus, where a finding applies, a registry entry. `MarketBaseline`
+is equally generic (builds `devig_*` column names off `MARKETS[market]["selections"]`, never
+hardcoded). `target_btts` and `target_htft` (9-class, `HTFT_CLASSES`) are already computed by every
+dataset build today; O/U 3.5 needs a new `label_ou35` + target column when pursued, a small addition.
+A "High-HT/FT" finding is architecturally identical to the coherence finding already shipped
+(odds-structure/cross-market signal, via `extra_columns`, predicting a specific target market/
+selection) — no new mechanism, just future feature work once HT/FT odds or team-identity signals
+are worth testing.
+
+**The one real blocker is data, not code.** football-data.co.uk carries no BTTS or HT/FT odds at
+all (see `docs/RESEARCH_RETROSPECTIVE.md`). Without odds, `MarketBaseline` degrades safely today
+(all-NaN, clean abstention end to end via `CanonicalPredictor`'s existing abstention handling — not
+a crash, not a false number) rather than silently misbehaving. Two future options, not decided now:
+(a) a goals-history-only model (e.g. Dixon-Coles-derived) as that market's promoted baseline instead
+of the market — `baseline` is already an injected dependency, not hardcoded, so this needs zero
+engine changes when pursued; or (b) a new odds data provider (same gated category as the
+proto-xG/E1-inefficiency acquisition question) if "beats the market" specifically (not just "beats a
+naive baseline") is required for that market.
+
+**Multi-match combination/system builder ("2-3 match coupons") is a distinct, separate future
+capability — not designed now.** Three things worth keeping conceptually separate so future design
+doesn't conflate them: (1) showing multiple markets for one match together — already supported;
+(2) a cross-market signal predicting one target market (the High-HT/FT layer) — already supported
+via `extra_columns`, same shape as coherence; (3) combining predictions *across different matches*
+into one coupon — genuinely new. For (3): the engine stays a pure, stateless
+`(match, market) -> prediction` function; session state (which matches a user selected/queried, to
+compare and combine) belongs entirely in the application/UI layer, never in `CanonicalPredictor`.
+Combining probabilities across different fixtures is a much safer independence assumption than
+combining different markets within the same match (which coherence already proved are correlated,
+see `docs/RESEARCH_RETROSPECTIVE.md`) — but whenever this is built, that assumption must be stated
+explicitly, not silently assumed via naive multiplication.
+
+## Pinnacle closing odds, Asian Handicap, and opening/closing line movement
+
+**Status: DONE — scoped, implemented, and exercised against the real database, 2026-07-06.**
+The generic odds-backfill mechanism (below) was applied to all 30 existing football-data.co.uk
+season files (E0/E1/SP1, 2015/16-2024/25) against the real database: **238,697 new odds quotes
+backfilled, zero conflicts, zero new or duplicated matches** (13,120 before and after). Breakdown:
+Pinnacle closing 1x2 39,351; closing O/U 2.5 (all bookmakers) 47,198; Asian Handicap opening 57,692;
+Asian Handicap closing 47,224; 1x2 closing (bet365 + market_avg) 47,232. A DB backup was taken
+before the run. `odds_ah`/`odds_closing` feature groups (below) remain future work — this milestone
+was ingestion-only, per the agreed tight scope. See project memory for the full implementation
+trail (schema, mapping, generic `_reconcile_odds` backfill, ports/repository changes, tests).
+
+football-data.co.uk's raw CSV files
+already contain data FootPred's importer doesn't map: Asian Handicap odds (aggregate-only for
+2015/16-2018/19; full per-bookmaker opening AND closing for 2019/20-2024/25) and per-bookmaker
+closing lines for 1x2 and O/U 2.5 (same era split). **Pinnacle's closing 1x2 price is present in
+every season already in the database, with zero coverage gaps** — a materially better full-history
+reference price than the market-average/O-U columns already known to have 0% coverage pre-2019.
+
+**Schema changes required (additive, backward-compatible, verified against actual code):** a
+nullable `line: float | None` on `OddsQuote`/`OddsRow` (Asian Handicap's line varies continuously
+per match, unlike O/U's fixed threshold baked into the market name); a nullable `price_point: str |
+None` (`"opening"`/`"closing"`) rather than overloading `recorded_at`, which represents an actual
+timestamp FootPred doesn't have for this data; extending the `Bookmaker` enum with `pinnacle`; a new
+`MARKET_AH` constant.
+
+**Feature-group design:** two new groups, `odds_ah` and `odds_closing`, following the exact
+precedent `tabular.py` already set with `odds_consensus`/`odds_divergence` as partitions alongside
+the original group — `odds_core` v1.0 stays frozen and untouched, not retrofitted with a phase
+dimension that would multiply its column space. `CanonicalPredictor`/`MarketBaseline`/de-vig all
+already market-agnostic (verified: `odds_math.devig()` is not hardcoded to 3 outcomes) — Asian
+Handicap needs no engine change, only the schema/mapping/feature-group work above.
+
+**What this unlocks:** a gap-free full-history sharp reference price (Pinnacle); genuine
+opening-to-closing line movement — a structurally different signal from the already-tested
+cross-bookmaker divergence (movement over time, not disagreement across sources at one time);
+closing-line value (CLV) becomes computable, the standard sharp-betting benchmark for genuine edge,
+a candidate future addition to `docs/VISION.md`'s validation criteria; Asian Handicap as FootPred's
+second real predictable market.
+
+## High-HT/FT Pattern Model (future research direction)
+
+**Status: proposed, not implemented — recorded 2026-07-06.** Deliberately tracked separately from
+the cross-market coherence thread (see "Corrected confirmatory 1x2-coherence milestone" in
+`docs/RESEARCH_RETROSPECTIVE.md`) and from the multi-market expansion note above — a different
+hypothesis via a different mechanism, not another transform of the same signal.
+
+**The hypothesis, precisely:** certain high-odds HT/FT outcomes (the reversal classes — 1/2, 2/1,
+1/X, 2/X, etc.) may be significantly more plausible than their unconditional base rate under
+specific combinations of: the HT/FT odds themselves, 1x2 odds structure, O/U markets, Asian
+Handicap lines, opening-vs-closing line movement, team identity, and a team's current-season
+behavioral patterns (comeback-after-trailing-at-HT rate, points-lost-after-leading-at-HT rate,
+slow-start/strong-finish tendency). The eventual product form is a dedicated model comparing
+estimated probabilities against the market to flag specific undervalued high-odds selections, at
+whatever evidence tier they earn — never an unvetted recommendation. A later "system" combination
+layer (multi-match coupons) is explicitly out of scope for this research question; see the
+multi-match note above.
+
+**Critical framing note — the behavioral ingredients here are not new inputs, but they are only
+one candidate feature within this model, not a standalone hypothesis (clarified 2026-07-06).** They
+are the same construct as two items already on record:
+- The already-**rejected** halftime resilience feature (continuous second-half-vs-first-half GD) —
+  its effect converged smoothly to zero R² across three data-volume checkpoints, the signature of a
+  genuine null, not an underpowered true effect.
+- The **never-tested** event-conditioned bucket (comeback tendency, lead-protection) and the
+  original HT/FT team-signature idea (see `docs/RESEARCH_RETROSPECTIVE.md`'s Open and plausible
+  hypotheses section) — both explicitly goal-history-derived, in the same category as five already
+  -failed tests.
+
+Halftime resilience's rejection trajectory is a warning sign, not a disqualifier — it tested a
+*continuous, pooled* measure, which could plausibly wash out a *sparser, conditional* effect that
+only shows up specifically in trailing/leading situations. But per this project's own precedent
+(`team_form` was never required to clear a standalone existence test before being evaluated in
+combination with odds — its Stage 2 ablation against a strong baseline was itself the test, and a
+stricter one than a solo check), the behavioral component does **not** need its own prerequisite
+project. It needs to be isolated *within* the eventual combination-model ablation instead — see
+"Recommended sequencing" below.
+
+**Why this still deserves to be tracked as a genuinely separate thread from coherence, not folded
+in:** coherence tests whether one well-defined cross-market disagreement measure predicts a large,
+liquid 3-way market with a well-powered sample. This hypothesis tests whether *several* combined
+signals (behavioral + multi-market structure) predict *rare, narrow* selections within a sparse
+9-way market that — once HT/FT odds exist — is very plausibly priced less efficiently than 1x2
+(lower volume, more complex to model, combinatorially sparse). That is a specific, articulable
+reason a different outcome is possible here, which is exactly what this project's closed-category
+rule requires before reopening it. Different mechanism, different target, different
+statistical-power profile: legitimate to track separately.
+
+**Data requirements, assessed critically rather than assumed:**
+1. HT/FT odds themselves — confirmed absent from football-data.co.uk entirely. Gated on the same
+   provider decision already scoped (2026-07-06 due diligence): Betfair Exchange/Historical Data
+   has the strongest *confirmed* HT/FT coverage found; SportMonks' Premium feed is plausible but
+   unconfirmed in detail.
+2. A resolved shrinkage design for current-season conditional rates. The original Team DNA
+   proposal's own sample-size math found only ~10-13 trailing-at-HT situations/team/season (a
+   ~&plusmn;19pp confidence interval) — nowhere near enough to estimate a raw current-season rate
+   per team without severe shrinkage toward a prior (a team's own multi-season history, or a
+   league-wide base rate). A statistical design decision to make at Stage 0, not a data-volume
+   problem alone.
+3. Multi-season HT/FT odds depth, once acquired, for a leakage-safe walk-forward evaluation held to
+   the same evidentiary bar as every prior ablation.
+
+**Would Pinnacle closing prices, Asian Handicap, and line movement meaningfully strengthen this?
+Yes, for a specific reason, with a specific cost.** Richer, more granular market structure (a sharp
+closing reference price, handicap-line detail, genuine movement over time) gives a combination
+model more surface to detect an actual structural mispricing signature — the same logic that
+motivated coherence's cross-market design. The cost: it also multiplies the candidate feature space
+against an already-sparse rare-event target, raising real overfitting risk that would need the same
+regularization-sensitivity discipline (C-grid checks) already standard here, likely plus an
+explicit feature-selection step given how few rare-event examples exist per selection.
+
+**Recommended sequencing whenever this is picked up (design intent only, not scheduled;
+revised 2026-07-06 — no standalone prerequisite step, per the correction above):**
+1. **Data-gated, single stage:** acquire HT/FT odds via whichever provider is chosen (Betfair or
+   SportMonks, pending the market-list verification already noted).
+2. Build the full combination model — market structure, odds relationships, Asian Handicap,
+   opening/closing movement, team identity, and behavioral features together — as one Stage 2
+   ablation design. **The ablation matrix must include an arm that isolates the behavioral
+   component's own marginal contribution** (market-structure-only vs. market-structure+behavioral),
+   mirroring exactly how `team_form`'s incremental value was isolated against odds, including
+   coefficient inspection to check whether its apparent signal survives or collapses once the rest
+   of the model is present. This is what actually answers whether the once-rejected-flavored
+   ingredient is doing real work — not a prerequisite gate before the study starts, but a required
+   view inside it.
+
 ## Paused feature registry
 
 **Status: proposed, not implemented.**

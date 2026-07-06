@@ -13,10 +13,22 @@ Reconciliation policy (identity vs. timing separated):
    pairing/date -> duplicate (a coarser copy of known data).
 5. Same-file/date-only double-header with different scores -> rejected as a
    conflict needing manual resolution or a source ID. Loud, never silent.
+
+Generic odds backfill: every branch above that concludes "this row matches
+an existing match" (1, 2, 3, and 4 when unambiguous) runs the row's odds
+through ``_reconcile_odds`` — any quote the mapping profile derives from
+this row that the match doesn't already have gets inserted (e.g. because the
+profile gained columns since the match was first imported), an
+already-stored identical quote is skipped, and a same-identity quote with a
+DIFFERENT value is a loud warning, never a silent overwrite. This makes
+extending a mapping profile (a new market, a new bookmaker, a new phase like
+closing odds) apply retroactively to already-imported matches just by
+re-running the same file, with no separate backfill tooling needed.
 """
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import List, Optional
@@ -48,6 +60,7 @@ class ImportReport:
     rows_enriched: int = 0
     rows_rejected: int = 0
     odds_quotes_stored: int = 0
+    odds_quotes_backfilled: int = 0
     rejections: List[dict] = field(default_factory=list)   # {row, reason}
     warnings: List[dict] = field(default_factory=list)     # {row, message}
     resolutions: List[dict] = field(default_factory=list)  # non-exact team decisions
@@ -133,6 +146,7 @@ class ImportPipeline:
             hit = self._uow.match_sources.get(self._profile.source_name, p.external_id)
             if hit is not None:
                 report.rows_duplicate += 1
+                self._reconcile_odds(hit.match_id, p, report)
                 return
 
         # 2. exact natural-key hit
@@ -148,6 +162,7 @@ class ImportPipeline:
                 )
             else:
                 report.rows_duplicate += 1
+                self._reconcile_odds(existing.id, p, report)  # type: ignore[arg-type]
             return
 
         siblings = self._uow.matches.find_by_pairing_date(
@@ -163,14 +178,20 @@ class ImportPipeline:
                 self._uow.matches.update(m)
                 report.rows_enriched += 1
                 report.add_warning(p.row_index,
-                                   "existing date-only match enriched with kickoff time; "
-                                   "odds from this row not re-imported")
+                                   "existing date-only match enriched with kickoff time")
                 self._maybe_add_source(m.id, p)
+                self._reconcile_odds(m.id, p, report)  # type: ignore[arg-type]
                 return
         # 4. coarser copy of an already-timed match
         else:
             if siblings:
                 report.rows_duplicate += 1
+                if len(siblings) == 1:
+                    # unambiguous — exactly one existing match for this
+                    # pairing/date. With >1 sibling there's no reliable way
+                    # to tell which one this coarser row belongs to, so odds
+                    # are left alone rather than guessed at.
+                    self._reconcile_odds(siblings[0].id, p, report)  # type: ignore[arg-type]
                 return
 
         # 5. genuinely new match
@@ -184,11 +205,47 @@ class ImportPipeline:
         self._maybe_add_source(match.id, p)
         quotes = [OddsQuote(id=None, match_id=match.id, bookmaker=o.bookmaker,  # type: ignore[arg-type]
                             market=o.market, selection=o.selection,
-                            decimal_odds=o.decimal_odds, recorded_at=None)
+                            decimal_odds=o.decimal_odds, line=o.line,
+                            price_point=o.price_point, recorded_at=None)
                   for o in p.odds]
         self._uow.odds.add_many(quotes)
         report.odds_quotes_stored += len(quotes)
         report.rows_imported += 1
+
+    def _reconcile_odds(self, match_id: int, p: ParsedRow, report: ImportReport) -> None:
+        """Generic odds backfill (used by every "this row matches an
+        existing match" branch): insert any odds this row's mapping produces
+        that the match doesn't already have -- e.g. because the mapping
+        profile gained columns (Asian Handicap, closing lines, ...) since
+        the match was first imported. An identity match with the SAME value
+        is skipped (already correctly stored); an identity match with a
+        DIFFERENT value is a loud conflict, never a silent overwrite."""
+        if not p.odds:
+            return
+        existing = self._uow.odds.existing_odds_for_match(match_id)
+        new_quotes: List[OddsQuote] = []
+        for o in p.odds:
+            key = (o.bookmaker, o.market, o.selection, o.line, o.price_point)
+            stored = existing.get(key)
+            if stored is None:
+                new_quotes.append(OddsQuote(
+                    id=None, match_id=match_id, bookmaker=o.bookmaker, market=o.market,
+                    selection=o.selection, decimal_odds=o.decimal_odds,
+                    line=o.line, price_point=o.price_point, recorded_at=None,
+                ))
+            elif not math.isclose(stored, o.decimal_odds, abs_tol=1e-9):
+                phase = "" if o.price_point is None else f"/{o.price_point}"
+                line = "" if o.line is None else f"@{o.line}"
+                report.add_warning(
+                    p.row_index,
+                    f"odds conflict for match {match_id} "
+                    f"({o.bookmaker}/{o.market}/{o.selection}{line}{phase}): "
+                    f"stored {stored} vs incoming {o.decimal_odds}; kept stored value",
+                )
+            # else: identical value already stored — nothing to do
+        if new_quotes:
+            self._uow.odds.add_many(new_quotes)
+            report.odds_quotes_backfilled += len(new_quotes)
 
     def _maybe_add_source(self, match_id: Optional[int], p: ParsedRow) -> None:
         if p.external_id is not None and match_id is not None:

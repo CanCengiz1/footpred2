@@ -6,7 +6,7 @@ upward. Behaviour must match infra.memory (the tested reference).
 from __future__ import annotations
 
 from datetime import date
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -183,12 +183,22 @@ class SqlOdds:
         self._s.add_all([
             m.OddsRow(match_id=q.match_id, bookmaker=q.bookmaker, market=q.market,
                       selection=q.selection, decimal_odds=q.decimal_odds,
-                      recorded_at=q.recorded_at)
+                      recorded_at=q.recorded_at, line=q.line, price_point=q.price_point)
             for q in quotes
         ])
 
     def count(self) -> int:
         return int(self._s.scalar(select(func.count(m.OddsRow.id))) or 0)
+
+    def existing_odds_for_match(
+        self, match_id: int
+    ) -> Dict[Tuple[str, str, str, Optional[float], Optional[str]], float]:
+        rows = self._s.execute(
+            select(m.OddsRow.bookmaker, m.OddsRow.market, m.OddsRow.selection,
+                   m.OddsRow.line, m.OddsRow.price_point, m.OddsRow.decimal_odds)
+            .where(m.OddsRow.match_id == match_id)
+        ).all()
+        return {(book, mkt, sel, line, pp): odds for book, mkt, sel, line, pp, odds in rows}
 
 
 class SqlImports:

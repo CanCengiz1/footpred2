@@ -29,6 +29,8 @@ class ParsedOdds:
     market: str
     selection: str
     decimal_odds: float
+    line: Optional[float] = None
+    price_point: Optional[str] = None
 
 
 @dataclass
@@ -189,15 +191,30 @@ def _parse_odds(
         if price < 1.01:
             warnings.append(f"odds {col}={price} < 1.01 dropped")
             continue
-        odds.append(ParsedOdds(spec.bookmaker, spec.market, spec.selection, price))
+        line: Optional[float] = None
+        if spec.line_col:
+            if spec.line_col not in row.index:
+                continue  # e.g. Asian Handicap without its line column — can't
+                          # record a meaningful quote, drop silently like any
+                          # other absent optional column
+            line = _as_odds(row.get(spec.line_col))
+            if line is None:
+                continue  # line present in the file but unparseable — same
+                          # "not every match is fully quoted" tolerance
+        odds.append(ParsedOdds(spec.bookmaker, spec.market, spec.selection, price,
+                                line=line, price_point=spec.price_point))
 
-    # 1X2 overround sanity per bookmaker
-    for book in {o.bookmaker for o in odds}:
-        trio = [o for o in odds if o.bookmaker == book and o.market == MARKET_1X2]
+    # 1X2 overround sanity per (bookmaker, price_point) — opening and closing
+    # 1x2 quotes from the same bookmaker must not be pooled into one trio
+    for book, phase in {(o.bookmaker, o.price_point) for o in odds}:
+        trio = [o for o in odds if o.bookmaker == book and o.market == MARKET_1X2
+                and o.price_point == phase]
         if len(trio) == 3:
             s = sum(1.0 / o.decimal_odds for o in trio)
             if not (1.00 <= s <= 1.25):
+                phase_label = "" if phase is None else f"/{phase}"
                 warnings.append(
-                    f"1X2 implied-prob sum for {book} is {s:.3f} (outside [1.00, 1.25])"
+                    f"1X2 implied-prob sum for {book}{phase_label} is {s:.3f} "
+                    "(outside [1.00, 1.25])"
                 )
     return odds, warnings

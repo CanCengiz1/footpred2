@@ -38,7 +38,8 @@ def render_report(report) -> None:
     c3.metric("Duplicates", report.rows_duplicate)
     c4.metric("Enriched", report.rows_enriched)
     c5.metric("Rejected", report.rows_rejected)
-    st.caption(f"Odds quotes stored: {report.odds_quotes_stored}")
+    st.caption(f"Odds quotes stored: {report.odds_quotes_stored} "
+               f"· backfilled onto already-known matches: {report.odds_quotes_backfilled}")
 
     if report.rejections:
         st.subheader("Rejected rows")

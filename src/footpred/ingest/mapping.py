@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from footpred.domain.entities import Bookmaker, MARKET_1X2, MARKET_BTTS, MARKET_OU_25
+from footpred.domain.entities import (
+    MARKET_1X2, MARKET_AH, MARKET_BTTS, MARKET_OU_25, Bookmaker,
+)
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,13 @@ class OddsColumn:
     bookmaker: str
     market: str
     selection: str
+    line_col: Optional[str] = None    # name of ANOTHER column in the same row
+                                       # holding this quote's numeric line
+                                       # (e.g. Asian Handicap's handicap
+                                       # value) — None for markets with no
+                                       # line, like 1x2
+    price_point: Optional[str] = None  # "opening" / "closing" / None
+                                        # (unspecified)
 
 
 @dataclass
@@ -94,6 +103,7 @@ _FD_LEAGUES: Dict[str, Tuple[str, str]] = {
 
 _B365 = Bookmaker.BET365.value
 _AVG = Bookmaker.MARKET_AVG.value
+_PIN = Bookmaker.PINNACLE.value
 
 FOOTBALL_DATA_CO_UK = MappingProfile(
     name="football-data.co.uk",
@@ -110,6 +120,7 @@ FOOTBALL_DATA_CO_UK = MappingProfile(
     league_code_map=_FD_LEAGUES,
     dayfirst=True,
     odds_columns={
+        # --- 1x2, opening (unchanged) ---
         "B365H": OddsColumn(_B365, MARKET_1X2, "home"),
         "B365D": OddsColumn(_B365, MARKET_1X2, "draw"),
         "B365A": OddsColumn(_B365, MARKET_1X2, "away"),
@@ -120,6 +131,48 @@ FOOTBALL_DATA_CO_UK = MappingProfile(
         "B365<2.5": OddsColumn(_B365, MARKET_OU_25, "under"),
         "Avg>2.5": OddsColumn(_AVG, MARKET_OU_25, "over"),
         "Avg<2.5": OddsColumn(_AVG, MARKET_OU_25, "under"),
+
+        # --- 1x2, closing (new; PSC* present in every season, B365C*/AvgC*
+        # only from 2019/20 -- detection_score already tolerates a profile
+        # declaring columns an older file lacks) ---
+        "B365CH": OddsColumn(_B365, MARKET_1X2, "home", price_point="closing"),
+        "B365CD": OddsColumn(_B365, MARKET_1X2, "draw", price_point="closing"),
+        "B365CA": OddsColumn(_B365, MARKET_1X2, "away", price_point="closing"),
+        "PSCH": OddsColumn(_PIN, MARKET_1X2, "home", price_point="closing"),
+        "PSCD": OddsColumn(_PIN, MARKET_1X2, "draw", price_point="closing"),
+        "PSCA": OddsColumn(_PIN, MARKET_1X2, "away", price_point="closing"),
+        "AvgCH": OddsColumn(_AVG, MARKET_1X2, "home", price_point="closing"),
+        "AvgCD": OddsColumn(_AVG, MARKET_1X2, "draw", price_point="closing"),
+        "AvgCA": OddsColumn(_AVG, MARKET_1X2, "away", price_point="closing"),
+
+        # --- O/U 2.5, closing (new; 2019/20 onward) ---
+        "B365C>2.5": OddsColumn(_B365, MARKET_OU_25, "over", price_point="closing"),
+        "B365C<2.5": OddsColumn(_B365, MARKET_OU_25, "under", price_point="closing"),
+        "PC>2.5": OddsColumn(_PIN, MARKET_OU_25, "over", price_point="closing"),
+        "PC<2.5": OddsColumn(_PIN, MARKET_OU_25, "under", price_point="closing"),
+        "AvgC>2.5": OddsColumn(_AVG, MARKET_OU_25, "over", price_point="closing"),
+        "AvgC<2.5": OddsColumn(_AVG, MARKET_OU_25, "under", price_point="closing"),
+
+        # --- Asian Handicap, opening, per-bookmaker era (2019/20 onward) ---
+        "B365AHH": OddsColumn(_B365, MARKET_AH, "home", line_col="AHh", price_point="opening"),
+        "B365AHA": OddsColumn(_B365, MARKET_AH, "away", line_col="AHh", price_point="opening"),
+        "PAHH": OddsColumn(_PIN, MARKET_AH, "home", line_col="AHh", price_point="opening"),
+        "PAHA": OddsColumn(_PIN, MARKET_AH, "away", line_col="AHh", price_point="opening"),
+        "AvgAHH": OddsColumn(_AVG, MARKET_AH, "home", line_col="AHh", price_point="opening"),
+        "AvgAHA": OddsColumn(_AVG, MARKET_AH, "away", line_col="AHh", price_point="opening"),
+
+        # --- Asian Handicap, opening, aggregate era (2015/16-2018/19: only
+        # a pooled market-average AH price exists, no per-bookmaker split) ---
+        "BbAvAHH": OddsColumn(_AVG, MARKET_AH, "home", line_col="BbAHh", price_point="opening"),
+        "BbAvAHA": OddsColumn(_AVG, MARKET_AH, "away", line_col="BbAHh", price_point="opening"),
+
+        # --- Asian Handicap, closing, per-bookmaker era (2019/20 onward) ---
+        "B365CAHH": OddsColumn(_B365, MARKET_AH, "home", line_col="AHCh", price_point="closing"),
+        "B365CAHA": OddsColumn(_B365, MARKET_AH, "away", line_col="AHCh", price_point="closing"),
+        "PCAHH": OddsColumn(_PIN, MARKET_AH, "home", line_col="AHCh", price_point="closing"),
+        "PCAHA": OddsColumn(_PIN, MARKET_AH, "away", line_col="AHCh", price_point="closing"),
+        "AvgCAHH": OddsColumn(_AVG, MARKET_AH, "home", line_col="AHCh", price_point="closing"),
+        "AvgCAHA": OddsColumn(_AVG, MARKET_AH, "away", line_col="AHCh", price_point="closing"),
     },
 )
 
@@ -142,10 +195,12 @@ def detect_profile(
 
 def load_profile(path: str | Path) -> MappingProfile:
     """Load a user-defined profile from JSON. Odds columns are declared as
-    {"ColName": {"bookmaker": "...", "market": "...", "selection": "..."}}."""
+    {"ColName": {"bookmaker": "...", "market": "...", "selection": "...",
+    "line_col": "..." (optional), "price_point": "..." (optional)}}."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     odds = {
-        col: OddsColumn(spec["bookmaker"], spec["market"], spec["selection"])
+        col: OddsColumn(spec["bookmaker"], spec["market"], spec["selection"],
+                        line_col=spec.get("line_col"), price_point=spec.get("price_point"))
         for col, spec in data.pop("odds_columns", {}).items()
     }
     fixed = data.pop("fixed_league", None)

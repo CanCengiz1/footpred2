@@ -89,6 +89,8 @@ class OddsRow(Base):
     selection: Mapped[str] = mapped_column(String(32))
     decimal_odds: Mapped[float] = mapped_column(Float)
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    line: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_point: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class ImportRow(Base):

@@ -23,6 +23,7 @@ class MatchStatus(str, Enum):
 class Bookmaker(str, Enum):
     BET365 = "bet365"
     MARKET_AVG = "market_avg"
+    PINNACLE = "pinnacle"
 
 
 # Markets are open strings by design (new markets must not require schema or
@@ -30,6 +31,7 @@ class Bookmaker(str, Enum):
 MARKET_1X2 = "1x2"
 MARKET_OU_25 = "ou_2.5"
 MARKET_BTTS = "btts"
+MARKET_AH = "ah"
 
 
 @dataclass
@@ -110,6 +112,22 @@ class OddsQuote:
     selection: str              # e.g. "home"/"draw"/"away", "over"/"under"
     decimal_odds: float
     recorded_at: Optional[datetime] = None   # None == unknown odds timing
+    line: Optional[float] = None             # numeric line, e.g. an Asian
+                                              # Handicap value; None for
+                                              # markets with no line (1x2)
+    price_point: Optional[str] = None        # "opening" / "closing" / None
+                                              # (unspecified — the original
+                                              # single-snapshot convention)
+
+    def identity_key(self) -> tuple:
+        """(bookmaker, market, selection, line, price_point) — the tuple that
+        determines whether two quotes represent the "same" price point, used
+        by the ingest pipeline's odds-backfill reconciliation. Deliberately
+        excludes match_id/id/decimal_odds: two quotes with this same tuple
+        for the same match are the same observation, not two different ones,
+        even if their prices differ (a differing price is a conflict to
+        surface, not a second quote to store)."""
+        return (self.bookmaker, self.market, self.selection, self.line, self.price_point)
 
 
 @dataclass

@@ -46,3 +46,33 @@ def test_load_custom_profile_from_json(tmp_path):
     assert profile.fixed_league == ("lg", "League", "Country")
     assert profile.odds_columns["o1"].selection == "home"
     assert profile.detection_score(["d", "h", "a", "fh", "fa", "o1"]) == 1.0
+
+
+def test_load_custom_profile_with_line_col_and_price_point(tmp_path):
+    spec = {
+        "name": "custom", "source_name": "custom",
+        "date_col": "d", "home_col": "h", "away_col": "a",
+        "fthg_col": "fh", "ftag_col": "fa", "dayfirst": False,
+        "odds_columns": {
+            "ah1": {"bookmaker": "bet365", "market": "ah", "selection": "home",
+                    "line_col": "ahline", "price_point": "closing"},
+            "o1": {"bookmaker": "bet365", "market": "1x2", "selection": "home"},
+        },
+    }
+    p = tmp_path / "custom_ah.json"
+    p.write_text(json.dumps(spec), encoding="utf-8")
+    profile = load_profile(p)
+    assert profile.odds_columns["ah1"].line_col == "ahline"
+    assert profile.odds_columns["ah1"].price_point == "closing"
+    # unspecified fields still default to None, unaffected
+    assert profile.odds_columns["o1"].line_col is None
+    assert profile.odds_columns["o1"].price_point is None
+
+
+def test_football_data_profile_declares_ah_and_closing_columns():
+    """Guards against accidentally losing the new mappings in a refactor."""
+    cols = FOOTBALL_DATA_CO_UK.odds_columns
+    assert cols["B365AHH"].market == "ah" and cols["B365AHH"].line_col == "AHh"
+    assert cols["B365CH"].price_point == "closing"
+    assert cols["BbAvAHH"].line_col == "BbAHh"
+    assert cols["PSCH"].bookmaker == "pinnacle"

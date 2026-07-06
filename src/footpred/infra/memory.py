@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import itertools
 from datetime import date
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from footpred.domain.entities import (
     ImportRecord,
@@ -140,6 +140,11 @@ class InMemoryOdds:
 
     def count(self) -> int:
         return len(self.items)
+
+    def existing_odds_for_match(
+        self, match_id: int
+    ) -> Dict[Tuple[str, str, str, Optional[float], Optional[str]], float]:
+        return {q.identity_key(): q.decimal_odds for q in self.items if q.match_id == match_id}
 
 
 class InMemoryImports:

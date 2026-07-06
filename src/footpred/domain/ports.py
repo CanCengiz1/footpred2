@@ -7,7 +7,7 @@ infra.memory (in-memory, used by the test suite).
 from __future__ import annotations
 
 from datetime import date
-from typing import Dict, List, Optional, Protocol, Sequence
+from typing import Dict, List, Optional, Protocol, Sequence, Tuple
 
 from .entities import (
     ImportRecord,
@@ -58,6 +58,16 @@ class MatchSourceRepository(Protocol):
 class OddsRepository(Protocol):
     def add_many(self, quotes: Sequence[OddsQuote]) -> None: ...
     def count(self) -> int: ...
+    def existing_odds_for_match(
+        self, match_id: int
+    ) -> Dict[Tuple[str, str, str, Optional[float], Optional[str]], float]:
+        """OddsQuote.identity_key() -> stored decimal_odds, for every quote
+        already stored against this match. Used by the ingest pipeline's
+        odds-backfill reconciliation to decide, per incoming quote, whether
+        it's genuinely new (insert), already present with the same value
+        (skip), or present with a different value (a conflict to surface,
+        never silently overwritten)."""
+        ...
 
 
 class ImportRepository(Protocol):

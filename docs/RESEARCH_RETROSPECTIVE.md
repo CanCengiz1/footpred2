@@ -72,6 +72,41 @@ transform of the same underlying information will fare differently. See
 [Falsified hypotheses](#falsified-hypotheses) for the full account of each test, and the closing
 note there for exactly what would justify reopening this category.
 
+**This finding now generalizes beyond scoreline-derived features specifically (2026-07-06).** The
+cross-market coherence test (see [Not confirmed findings](#not-confirmed-findings)) was not a
+scoreline-derived feature at all — it used no team-identity or historical-result information
+whatsoever, only the bookmaker's own quoted prices across two markets checked against each other
+for internal consistency. It failed independent replication the same way the five scoreline
+features failed Stage 2: a result that looked real by every internal check evaporated (reversed
+sign, lost stability across the entire regularization grid) the moment genuinely independent data
+was used to test it. **Six independently designed tests, across two mechanistically distinct input
+categories, have now converged on the same answer.**
+
+**The common property across all six is not the specific feature — it's the information source.**
+Every one of them is a function solely of variables a professional odds compiler already has
+directly in front of them before ever setting a price: historical results and goal timings on one
+side, their own cross-market price structure on the other. Where a mechanism could be inspected
+directly (`team_form`'s coefficient collapse — the strongest raw predictor lost ~87% of its
+magnitude once odds were added), the underlying variable wasn't irrelevant to outcomes; it was
+already reflected in the price. That is the generalizable lesson, and it is more precise than "the
+market is efficient": it is **the market is efficient with respect to its own primary inputs** —
+close to expected in a liquid, heavily-traded market, and exactly what a well-calibrated
+falsification program should keep finding as long as it keeps testing that specific information
+source.
+
+**Strategic conclusion: FootPred should stop prioritizing signals derived from information the
+odds compiler already has** — historical scorelines, public results, or the bookmaker's own price
+structure (cross-market coherence, cross-bookmaker divergence, and by the same logic, Asian
+Handicap or opening/closing line-movement features derived purely from public prices) — **unless a
+future hypothesis has a specific, articulated reason why it would escape this failure mode.** See
+[Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out) for how this now
+applies to specific future proposals. This is not a claim that football betting markets are
+unbeatable in general — it is a scoped claim about the two information categories this project has
+actually tested, across the specific leagues and markets in the current database. It does not
+extend to information genuinely outside a compiler's default input set (e.g. shot-quality/xG data,
+or player-availability signals with a demonstrable freshness edge) — those remain untested, not
+disqualified.
+
 ---
 
 ## Research methodology
@@ -131,33 +166,95 @@ pre-specified. Results are now judged qualitatively but consistently, on:
 - **trajectory across data-growth checkpoints** — a real effect should hold or strengthen as more
   data arrives; several rejected effects visibly *shrank* toward zero instead (see below).
 
-### A fourth classification tier: provisionally promoted, pending independent replication
+### Classification tiers for ablation results, and a stricter gate for provisional promotion
 
 The original three-way outcome for an ablation — rejected, promoted, or inconclusive/underpowered —
 turned out not to have a good home for a result that is real by every check this project applies
 (consistent across the majority of informative folds, survives a regularization sweep without
 collapsing or reversing, improves multiple metrics together) but has only ever been evaluated on
-one body of data. Forcing that into "promoted" overstates confidence that hasn't actually been
-earned yet; forcing it into "inconclusive" understates a result that is meaningfully different from
-this project's established noise band. A fourth tier was introduced to describe it honestly:
+one body of data. A fourth tier was introduced to describe it honestly — and, after the coherence
+finding's replication failure (2026-07-06, see [Not confirmed findings](#not-confirmed-findings)),
+a stricter, magnitude-based gate was added to it:
 
-- **Provisionally promoted** — a robustness-checked positive result (survives a regularization/
-  sensitivity sweep, coherent across metrics, majority-consistent sign across informative folds)
-  that has **not yet been independently replicated** on data that played no role in discovering it.
-  Usable in further experiments as a live candidate; not yet an established finding.
+- **Provisionally promoted** — a robustness-checked positive result that has **not yet been
+  independently replicated** on data that played no role in discovering it, AND whose effect
+  magnitude is **clearly beyond this project's established noise band** (roughly 0.0005–0.005
+  log-loss units; see "Judging effect sizes" above) — not merely internally consistent across a
+  regularization sweep. **Surviving a C-grid is necessary but no longer sufficient on its own.** A
+  small number of features can produce a stable-looking sweep by chance, especially when the effect
+  itself sits inside the noise band; robustness across hyperparameters shows a result isn't an
+  artifact of one arbitrary choice, but it says nothing about whether the result is bigger than
+  measurement noise in the first place. Usable in further experiments as a live candidate; not yet
+  an established finding.
+- **Interesting, pending replication** — a result that clears every robustness check above
+  (majority-consistent sign, stable across the regularization grid, coherent across metrics) but
+  whose effect magnitude sits **inside** the established noise band. This does **not** qualify as
+  provisionally promoted. It is a documentation-only holding label, not a fifth registry tier —
+  such a finding is simply not yet entered in `configs/findings_registry.json` (same as any
+  untested hypothesis) and carries no weight in the canonical prediction. It is recorded here as a
+  named, open thread rather than silently dropped, but is treated with the same caution as an
+  untested hypothesis until either (a) a richer ablation (more features, a larger or more diverse
+  population) shows a materially larger effect, or (b) independent/prospective replication is
+  attempted directly — whichever comes first. The purpose of this tier is to stop a marginal effect
+  from resting indefinitely in a "live candidate" state it hasn't actually earned.
 - **Promoted** — a provisionally promoted result that **has** been independently replicated on
   previously unseen data. The defining property is **independence, not chronology or data source**:
   newly imported seasons, additional leagues, a different compatible historical dataset — any of
   these count, as long as the replication data was not involved in discovering the original signal.
   A later season becoming available is not privileged over, say, a new league being added; what
   matters is that the data wasn't part of the original search.
-- **Not confirmed** — independent replication was attempted and failed to reproduce the effect.
+- **Not confirmed** — independent replication was attempted (from "provisionally promoted" or, in
+  principle, directly from "interesting, pending replication") and failed to reproduce the effect.
   Treated with the same respect as any other null result — not silently retried until it works.
+
+**Why this gate was added, specifically:** the coherence → 1x2 finding was elevated to
+"provisionally promoted" on the strength of a C-grid that never reversed across a 1000x
+regularization range — but its own writeup already flagged, at the time, that its mean effect size
+sat "at the edge of, not clearly beyond" the noise band, and that a 2-3-feature C-grid was a
+structurally weaker stress test than `team_form`'s 49-feature one. Both hedges turned out to be
+exactly right: the finding failed its first independent replication, with the sign flipping
+repeatedly across the same C-grid that had looked stable before. A small-magnitude effect passing a
+small-feature C-grid was, in hindsight, not strong enough evidence to justify the label it was
+given. This gate exists specifically because of that outcome, not designed in the abstract.
 
 This is deliberately a general framework, not coupled to any one future milestone (e.g. the next
 Data Expansion checkpoint) — whatever independent dataset becomes available first is the natural
 occasion to attempt confirmation, and this section should be updated whenever that happens for any
-provisionally promoted finding, not just the one that motivated adding this tier.
+provisionally promoted (or interesting, pending replication) finding, not just the one that
+motivated adding this tier.
+
+### Data-growth trajectory is not a substitute for prospective replication
+
+The "trajectory across data-growth checkpoints" criterion (see "Judging effect sizes" above) was
+originally used to catch effects that shrink toward zero as more of the same historical era is
+added to an ongoing search — exactly the signature all five falsified scoreline features showed
+(see [Falsified hypotheses](#falsified-hypotheses)). That check is real and has repeatedly done its
+job. But it is a check for a *decaying-to-null* pattern within a still-not-independent,
+backward-expanding evaluation window — it re-derives the same underlying discovery-era population
+with more of its own history included, not genuinely new data collected after the hypothesis was
+frozen.
+
+The coherence finding is the case that exposes why this must be named as a separate, weaker
+category of evidence than true replication. Unlike the five falsified features, its effect was
+observed to *grow*, not shrink, across earlier checkpoints — one of the reasons it was judged more
+credible than the underpowered divergence result at the time. It still failed outright the first
+time it was tested against data collected after the hypothesis was fixed (the newly imported
+2025/26 season). Growing within an expanding-but-still-retrospective search window did not predict
+holding up under a genuinely prospective test.
+
+**Going forward, these are two different evidentiary tiers, not two points on the same spectrum:**
+
+- **Data-growth trajectory** — re-evaluating the same hypothesis as more historical-era data is
+  added to the discovery population. Useful for catching a decaying/spurious effect, and for
+  gauging whether an already-paused family's null result is stable. **Not** sufficient grounds, on
+  its own, to elevate or sustain a "provisionally promoted" classification — a *growing* trajectory
+  should carry no more evidentiary weight toward promotion than a flat one; neither substitutes for
+  the next bullet.
+- **Prospective / independent replication** — testing an already-frozen hypothesis against data
+  that played no role whatsoever in discovering or tuning it (a newly imported season, a new
+  league, a different dataset). The only evidence this project treats as sufficient to move a
+  finding from provisionally promoted to promoted, or to reveal that it should move to not
+  confirmed instead.
 
 ### Leakage discipline
 
@@ -448,6 +545,15 @@ so this is classified as **underpowered, not rejected**. Revisit if historical m
 coverage improves or additional bookmaker sources are added; do not re-run expecting a different
 answer on the same coverage.
 
+**Updated prior (2026-07-06):** cross-market coherence — a related, arguably more sophisticated
+cross-market-consistency test — failed independent replication (see
+[Not confirmed findings](#not-confirmed-findings)). Per the strategic conclusion in
+[Core finding](#core-finding), this family (signal derived from disagreement or consistency
+between the bookmaker's own public prices) now carries a materially lower prior than before. A
+future revisit should treat that as the relevant precedent, not the still-open "underpowered"
+label alone — improved coverage would resolve the power problem, but not the more fundamental
+question this project now has evidence about.
+
 ### E1-specific market inefficiency (the basis for a proto-xG investment)
 
 The long-term roadmap's argument for acquiring shot/xG-quality data was conditional on E1
@@ -485,6 +591,20 @@ the ideas aren't re-proposed as if new.
   a regularization sweep. The category is formally closed (see the Core Finding section); a new
   proposal here needs a specific reason it would break that pattern, not just a new transform of
   the same information.
+- **Any new feature derived purely from cross-market or cross-bookmaker price structure** (e.g.
+  Asian Handicap features, opening-to-closing line movement / CLV, further cross-bookmaker
+  divergence variants) **without a specific, articulated reason it would escape coherence's
+  failure mode (added 2026-07-06).** Cross-market coherence → 1x2 was the strongest, most
+  metric-coherent positive result this project has produced, survived every internal robustness
+  check it was given, and still failed its first independent replication (see
+  [Not confirmed findings](#not-confirmed-findings)). Its failure mechanistically generalizes
+  beyond itself: any signal built solely from information a bookmaker's own pricing already
+  directly incorporates — including its own quoted prices across markets or over time — now
+  carries the same reduced prior as a new scoreline-derived feature, not a fresh one. This does
+  not disqualify Asian Handicap or line-movement data as a future direction outright (the data
+  already exists in the DB, ingested but unused by any feature group) — it means a proposal to use
+  it needs the same kind of specific, articulated argument the scoreline-derived category requires
+  before being reopened, not merely "the data is available."
 - **Pure data-volume expansion (further M3/M4-style growth) as an end in itself.** Demonstrated
   directly: fixing Dixon-Coles's two implementation defects mattered far more than a 10x increase
   in training data. More data remains useful for specific, targeted reasons (a richer model that
@@ -531,10 +651,14 @@ Durable tools this research has produced, independent of any single result:
 
 Before proposing a new research direction or feature:
 
-1. **Check the falsified-hypotheses section** for anything mechanistically similar. If the new
-   idea is "another way of deriving signal from historical scorelines," the `team_form` mechanism
-   almost certainly applies — that is not a reason to skip testing it, but it is a reason to expect
-   a null result and to say so before running the test.
+1. **Check the falsified and not-confirmed sections** for anything mechanistically similar. If the
+   new idea is "another way of deriving signal from historical scorelines," the `team_form`
+   mechanism almost certainly applies. If it's "another way of checking the market's own price
+   structure for exploitable signal" (cross-bookmaker divergence, cross-market coherence, Asian
+   Handicap, opening/closing movement), the coherence finding's replication failure almost
+   certainly applies (see [Directions deprioritized or ruled out](#directions-deprioritized-or-ruled-out)).
+   Neither is a reason to skip testing — it's a reason to expect a null result, say so before
+   running the test, and require a specific, articulated reason before proceeding anyway.
 2. **Check the provisionally promoted and not-confirmed sections** before treating a live candidate
    as either fully established or non-existent — and if independent data becomes available for any
    reason, that is the occasion to attempt the confirmation check described there, not something to
@@ -546,8 +670,11 @@ Before proposing a new research direction or feature:
 5. **Use the methodology section** as the evaluation checklist for any new experiment — pre-register
    a primary endpoint, check leakage and coverage explicitly, judge results against observed noise
    rather than an invented threshold, treat any segmented breakdown as hypothesis-generating only,
-   and use the four-tier classification (rejected / provisionally promoted / promoted / not
-   confirmed) rather than forcing a result into the wrong bucket for convenience.
+   gate "provisionally promoted" on effect magnitude clearly beyond the noise band and not merely
+   C-grid stability, treat a growing data-growth trajectory as informative but never equivalent to
+   prospective replication, and use the resulting classification (rejected / interesting-pending-
+   replication / provisionally promoted / promoted / not confirmed) rather than forcing a result
+   into the wrong bucket for convenience.
 
 This document should be **read before ROADMAP.md's next milestone is scoped**, not just after it
 runs — its job is to keep new work honest about what's already known, not to catalog results after
